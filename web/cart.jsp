@@ -206,6 +206,7 @@
                 }
             }
             request.setAttribute("cartTotal", total);
+            request.setAttribute("cartTotalQty", totalQty);
         %>
 
         <div class="page">
@@ -290,7 +291,7 @@
                     <div class="summary-title">Tóm tắt đơn hàng</div>
                     <div class="summary-row">
                         <span>Tổng số lượng</span>
-                        <span><c:out value="${fn:length(sessionScope.cart)}" /></span>
+                        <span>${cartTotalQty}</span>
                     </div>
                     <div class="summary-row">
                         <span>Tạm tính</span>

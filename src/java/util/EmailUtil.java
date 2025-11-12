@@ -11,9 +11,9 @@ public class EmailUtil {
     private static final String FROM_EMAIL = "ttanh.dhti16a2hn@sv.uneti.edu.vn";
     private static final String APP_PASSWORD = "larmmpkuwvdc zvyt".replace(" ", ""); // Xóa khoảng trắng cho chắc
 
-    public static void sendEmail(String toEmail, String subject, String messageText) throws MessagingException, UnsupportedEncodingException {
+    public static void sendEmail(String toEmail, String subject, String messageText, boolean isOtp)
+            throws MessagingException, UnsupportedEncodingException {
 
-        // ✅ Cấu hình Gmail SMTP (chuẩn)
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
@@ -21,7 +21,6 @@ public class EmailUtil {
         props.put("mail.smtp.port", "587");
         props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
 
-        // ✅ Tạo session có xác thực Gmail
         Session session = Session.getInstance(props, new Authenticator() {
             @Override
             protected PasswordAuthentication getPasswordAuthentication() {
@@ -29,28 +28,44 @@ public class EmailUtil {
             }
         });
 
-        // ✅ Soạn email
         Message message = new MimeMessage(session);
-        message.setFrom(new InternetAddress(FROM_EMAIL, "UNETI Shop")); // tên hiển thị
+        message.setFrom(new InternetAddress(FROM_EMAIL, "UNETI Shop"));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
         message.setSubject(subject);
 
-        // ✅ Cho phép gửi email HTML đẹp hơn
-        String htmlContent = """
-                <html>
-                  <body style='font-family:Arial, sans-serif;'>
-                    <h3>Mã xác thực OTP của bạn:</h3>
-                    <p style='font-size:18px;color:#2c3e50;'><b>%s</b></p>
-                    <p>Mã này có hiệu lực trong 5 phút.</p>
-                    <p>Trân trọng,<br>UNETI Shop</p>
-                  </body>
-                </html>
-                """.formatted(messageText);
+        // ✅ Nội dung khác nhau theo OTP hoặc reset password
+        String htmlContent;
+        if (isOtp) {
+            htmlContent = """
+            <html>
+              <body style='font-family:Arial, sans-serif;'>
+                <h3>Mã xác thực OTP của bạn:</h3>
+                <p style='font-size:18px;color:#2c3e50;'><b>%s</b></p>
+                <p>Mã này có hiệu lực trong 5 phút.</p>
+                <p>Trân trọng,<br>UNETI Shop</p>
+              </body>
+            </html>
+            """.formatted(messageText);
+        } else { // reset password
+            htmlContent = """
+            <html>
+              <body style='font-family:Arial, sans-serif;'>
+                <p>Nhấn vào link sau để đặt lại mật khẩu (hết hạn 1 giờ):</p>
+                <p><a href='%s'>%s</a></p>
+                <p>Trân trọng,<br>UNETI Shop</p>
+              </body>
+            </html>
+            """.formatted(messageText, messageText);
+        }
 
         message.setContent(htmlContent, "text/html; charset=UTF-8");
-
-        // ✅ Gửi email
-        Transport.send(message);
-        System.out.println("✅ OTP đã gửi thành công tới: " + toEmail);
+        try {
+            Transport.send(message);
+            System.out.println("✅ Email đã gửi thành công tới: " + toEmail);
+        } catch (MessagingException e) {
+            e.printStackTrace(); // in chi tiết lỗi ra console
+            throw e; // vẫn ném lên để servlet xử lý, ví dụ show "Gửi email thất bại!"
+        }
     }
+
 }
