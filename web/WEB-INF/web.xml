@@ -1,79 +1,66 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<web-app version="6.0" xmlns="https://jakarta.ee/xml/ns/jakartaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee                              https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd">
+<web-app version="6.0"
+         xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd">
+
     <display-name>LightWebProject</display-name>
-    <!-- ===== CHARACTER ENCODING FILTER FOR VIETNAMESE SUPPORT ===== -->
+
+    <!-- Character Encoding Filter -->
     <filter>
         <filter-name>CharacterEncodingFilter</filter-name>
         <filter-class>filter.CharacterEncodingFilter</filter-class>
-        <init-param>
-            <param-name>encoding</param-name>
-            <param-value>UTF-8</param-value>
-        </init-param>
-        <init-param>
-            <param-name>forceEncoding</param-name>
-            <param-value>true</param-value>
-        </init-param>
+        <init-param><param-name>encoding</param-name><param-value>UTF-8</param-value></init-param>
+        <init-param><param-name>forceEncoding</param-name><param-value>true</param-value></init-param>
     </filter>
     <filter-mapping>
         <filter-name>CharacterEncodingFilter</filter-name>
         <url-pattern>/*</url-pattern>
     </filter-mapping>
-    <!-- Servlets mapping -->
+
+    <!-- Existing servlets -->
+    <servlet><servlet-name>ProductServlet</servlet-name><servlet-class>controller.ProductServlet</servlet-class></servlet>
+    <servlet><servlet-name>PaymentServlet</servlet-name><servlet-class>controller.PaymentServlet</servlet-class></servlet>
+    <servlet><servlet-name>AuthServlet</servlet-name><servlet-class>controller.AuthServlet</servlet-class></servlet>
+    <servlet><servlet-name>CartServlet</servlet-name><servlet-class>controller.CartServlet</servlet-class></servlet>
+    <servlet><servlet-name>AdminProductServlet</servlet-name><servlet-class>controller.AdminProductServlet</servlet-class></servlet>
+    <servlet><servlet-name>ProfileServlet</servlet-name><servlet-class>controller.ProfileServlet</servlet-class></servlet>
+
+    <!-- QuoteServlet theo wildcard -->
     <servlet>
-        <servlet-name>ProductServlet</servlet-name>
-        <servlet-class>controller.ProductServlet</servlet-class>
+        <servlet-name>QuoteServlet</servlet-name>
+        <servlet-class>controller.QuoteServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
     </servlet>
+
+    <!-- InvoicePrintServlet (trả về HTML invoice) -->
     <servlet>
-        <servlet-name>PaymentServlet</servlet-name>
-        <servlet-class>controller.PaymentServlet</servlet-class>
+        <servlet-name>InvoiceServlet</servlet-name>
+        <servlet-class>controller.InvoiceServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
     </servlet>
-    <servlet>
-        <servlet-name>AuthServlet</servlet-name>
-        <servlet-class>controller.AuthServlet</servlet-class>
-    </servlet>
-    <servlet>
-        <servlet-name>CartServlet</servlet-name>
-        <servlet-class>controller.CartServlet</servlet-class>
-    </servlet>
-    <servlet>
-        <servlet-name>AdminProductServlet</servlet-name>
-        <servlet-class>controller.AdminProductServlet</servlet-class>
-    </servlet>
-    <servlet>
-        <servlet-name>ProfileServlet</servlet-name>
-        <servlet-class>controller.ProfileServlet</servlet-class>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>ProductServlet</servlet-name>
-        <url-pattern>/products</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
-        <servlet-name>AuthServlet</servlet-name>
-        <url-pattern>/auth</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
-        <servlet-name>CartServlet</servlet-name>
-        <url-pattern>/cart</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
-        <servlet-name>PaymentServlet</servlet-name>
-        <url-pattern>/payment</url-pattern>
-    </servlet-mapping>
-    <servlet-mapping>
-        <servlet-name>AdminProductServlet</servlet-name>
-        <url-pattern>/admin/products</url-pattern>
-    </servlet-mapping>
-    <!-- JSP configuration with correct schema for Jakarta EE 6.0 -->
+
+    <!-- Mappings -->
+    <servlet-mapping><servlet-name>ProductServlet</servlet-name><url-pattern>/products</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>AuthServlet</servlet-name><url-pattern>/auth</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>CartServlet</servlet-name><url-pattern>/cart</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>PaymentServlet</servlet-name><url-pattern>/payment</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>AdminProductServlet</servlet-name><url-pattern>/admin/products</url-pattern></servlet-mapping>
+    <servlet-mapping><servlet-name>ProfileServlet</servlet-name><url-pattern>/profile</url-pattern></servlet-mapping>
+
+    <!-- Wildcard cho cả /quote, /quote/print, /quote/download -->
+    <servlet-mapping><servlet-name>QuoteServlet</servlet-name><url-pattern>/quote/*</url-pattern></servlet-mapping>
+
+    <!-- URL invoice preview: /invoice/print -->
+    <servlet-mapping><servlet-name>InvoiceServlet</servlet-name><url-pattern>/invoice/print</url-pattern></servlet-mapping>
+
     <jsp-config>
         <jsp-property-group>
             <url-pattern>*.jsp</url-pattern>
             <page-encoding>UTF-8</page-encoding>
         </jsp-property-group>
     </jsp-config>
-    <servlet-mapping>
-        <servlet-name>ProfileServlet</servlet-name>
-        <url-pattern>/profile</url-pattern>
-    </servlet-mapping>
+
     <welcome-file-list>
         <welcome-file>products</welcome-file>
     </welcome-file-list>

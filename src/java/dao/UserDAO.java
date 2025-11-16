@@ -43,7 +43,8 @@ public class UserDAO {
                             rs.getString("full_name"),
                             rs.getString("email"),
                             rs.getString("password_hash"),
-                            rs.getString("role")
+                            rs.getString("role"),
+                            rs.getString("phoneNumber")
                     );
                 }
             }
@@ -76,7 +77,8 @@ public class UserDAO {
                             rs.getString("full_name"),
                             rs.getString("email"),
                             rs.getString("password_hash"),
-                            rs.getString("role")
+                            rs.getString("role"),
+                            rs.getString("phoneNumber")
                     );
                 }
             }
@@ -134,7 +136,8 @@ public class UserDAO {
                             rs.getString("full_name"),
                             rs.getString("email"),
                             rs.getString("password_hash"),
-                            rs.getString("role")
+                            rs.getString("role"),
+                            rs.getString("phoneNumber")
                     );
                 }
             }
@@ -170,7 +173,8 @@ public class UserDAO {
                             rs.getString("full_name"),
                             rs.getString("email"),
                             rs.getString("password_hash"),
-                            rs.getString("role")
+                            rs.getString("role"),
+                            rs.getString("phoneNumber")
                     );
                 }
             }
@@ -178,6 +182,81 @@ public class UserDAO {
             e.printStackTrace();
         }
         return null;
+    }
+
+    //search
+    public List<User> searchUsers(String keyword) {
+        List<User> list = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE full_name LIKE ? OR email LIKE ? OR role LIKE ? OR phoneNumber LIKE ? ORDER BY user_id";
+
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            String k = "%" + keyword + "%";
+            ps.setString(1, k);
+            ps.setString(2, k);
+            ps.setString(3, k);
+            ps.setString(4, k);
+
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                User u = new User();
+                u.setId(rs.getInt("user_id"));
+                u.setFullName(rs.getString("full_name"));
+                u.setEmail(rs.getString("email"));
+                u.setRole(rs.getString("role"));
+                u.setPhoneNumber(rs.getString("phoneNumber"));
+                list.add(u);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    // change
+    public boolean deleteUser(int id) {
+        String sql = "DELETE FROM users WHERE user_id=?";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean changeUserRole(int id, String role) {
+        String sql = "UPDATE users SET role = ? WHERE id = ?";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, role);
+            ps.setInt(2, id);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+// Lấy user theo id
+    public User getUserById(int id) {
+        User user = null;
+        String sql = "SELECT * FROM users WHERE user_id=?";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    user = new User();
+                    user.setId(rs.getInt("id"));
+                    user.setFullName(rs.getString("full_name"));
+                    user.setEmail(rs.getString("email"));
+                    user.setPassword(rs.getString("password_hash"));
+                    // Các trường khác tùy yêu cầu
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return user;
     }
 
     public List<User> getAllUsers() {
@@ -190,7 +269,8 @@ public class UserDAO {
                         rs.getString("full_name"),
                         rs.getString("email"),
                         rs.getString("password_hash"),
-                        rs.getString("role")
+                        rs.getString("role"),
+                        rs.getString("phoneNumber")
                 ));
             }
         } catch (SQLException e) {

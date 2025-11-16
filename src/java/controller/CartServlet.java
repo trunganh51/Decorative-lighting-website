@@ -1,7 +1,7 @@
 package controller;
 
 import dao.ProductDAO;
-import model.CartItem;
+import model.OrderDetail;
 import model.Product;
 
 import jakarta.servlet.ServletException;
@@ -17,6 +17,7 @@ import java.util.Map;
 
 @WebServlet(name = "CartServlet", urlPatterns = "/cart")
 public class CartServlet extends HttpServlet {
+
     private final ProductDAO productDAO = new ProductDAO();
 
     @Override
@@ -29,14 +30,13 @@ public class CartServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // ✅ CRITICAL: Set encoding first
         req.setCharacterEncoding("UTF-8");
         resp.setCharacterEncoding("UTF-8");
-        
+
         HttpSession session = req.getSession(true);
 
         @SuppressWarnings("unchecked")
-        Map<Integer, CartItem> cart = (Map<Integer, CartItem>) session.getAttribute("cart");
+        Map<Integer, OrderDetail> cart = (Map<Integer, OrderDetail>) session.getAttribute("cart");
         if (cart == null) {
             cart = new HashMap<>();
         }
@@ -53,13 +53,19 @@ public class CartServlet extends HttpServlet {
                 Product product = productDAO.getProductById(productId);
 
                 if (product != null) {
-                    CartItem item = cart.get(productId);
-                    if (item == null) {
-                        item = new CartItem(product, quantity);
+                    OrderDetail line = cart.get(productId);
+                    if (line == null) {
+                        line = new OrderDetail();
+                        line.setProduct(product);
+                        line.setProductId(product.getId());
+                        line.setQuantity(quantity);
+                        line.setPrice(product.getPrice());
                     } else {
-                        item.setQuantity(item.getQuantity() + quantity);
+                        line.setQuantity(line.getQuantity() + quantity);
+                        // Giá giữ nguyên theo lần thêm đầu tiên hoặc bạn có thể sync lại:
+                        // line.setPrice(product.getPrice());
                     }
-                    cart.put(productId, item);
+                    cart.put(productId, line);
                     success = true;
                     message = "Đã thêm sản phẩm vào giỏ hàng";
                 } else {
@@ -69,13 +75,13 @@ public class CartServlet extends HttpServlet {
             } else if ("update".equals(action)) {
                 int productId = Integer.parseInt(req.getParameter("productId"));
                 int quantity = Integer.parseInt(req.getParameter("quantity"));
-                CartItem item = cart.get(productId);
-                if (item != null) {
+                OrderDetail line = cart.get(productId);
+                if (line != null) {
                     if (quantity <= 0) {
                         cart.remove(productId);
                         message = "Đã xóa sản phẩm khỏi giỏ hàng";
                     } else {
-                        item.setQuantity(quantity);
+                        line.setQuantity(quantity);
                         message = "Đã cập nhật số lượng";
                     }
                     success = true;
@@ -92,6 +98,24 @@ public class CartServlet extends HttpServlet {
                 } else {
                     message = "Không tìm thấy sản phẩm trong giỏ hàng";
                 }
+
+            } else if ("bulkUpdate".equals(action)) {
+                for (String key : req.getParameterMap().keySet()) {
+                    if (key.startsWith("quantity_")) {
+                        int productId = Integer.parseInt(key.substring(9)); // "quantity_"
+                        int quantity = Integer.parseInt(req.getParameter(key));
+                        OrderDetail line = cart.get(productId);
+                        if (line != null) {
+                            if (quantity <= 0) {
+                                cart.remove(productId);
+                            } else {
+                                line.setQuantity(quantity);
+                            }
+                        }
+                    }
+                }
+                success = true;
+                message = "Đã cập nhật số lượng sản phẩm";
             }
 
         } catch (NumberFormatException e) {
@@ -102,40 +126,31 @@ public class CartServlet extends HttpServlet {
             e.printStackTrace();
         }
 
-        // Calculate cart count
-        cartCount = cart.values().stream().mapToInt(CartItem::getQuantity).sum();
+        // Tính tổng số lượng trong giỏ
+        cartCount = cart.values().stream().mapToInt(OrderDetail::getQuantity).sum();
 
-        // Update session
+        // Cập nhật session
         session.setAttribute("cart", cart);
         session.setAttribute("cartSize", cartCount);
-
-        // ✅ Enhanced AJAX response with more information
+        session.setAttribute("cartDistinct", cart.size());
+        // Nếu là AJAX
         if ("XMLHttpRequest".equals(req.getHeader("X-Requested-With"))) {
             resp.setContentType("application/json;charset=UTF-8");
             try (PrintWriter out = resp.getWriter()) {
                 out.write(String.format(
-                    "{\"success\": %s, \"message\": \"%s\", \"cartCount\": %d, \"cartSize\": %d}",
-                    success, message, cartCount, cartCount
+                        "{\"success\": %s, \"message\": \"%s\", \"cartCount\": %d, \"cartSize\": %d}",
+                        success, message, cartCount, cartCount
                 ));
-                out.flush();
             }
             return;
         }
 
-        // ✅ Regular form submission - redirect back with success message
+        // Nếu là request bình thường, redirect về lại trang trước
         String referer = req.getHeader("referer");
         if (referer != null && !referer.isEmpty()) {
-            String redirectUrl = referer;
-            if (success) {
-                redirectUrl += (referer.contains("?") ? "&" : "?") + "added=true";
-            }
-            resp.sendRedirect(redirectUrl);
+            resp.sendRedirect(referer);
         } else {
-            String redirectUrl = req.getContextPath() + "/products?action=list";
-            if (success) {
-                redirectUrl += "&added=true";
-            }
-            resp.sendRedirect(redirectUrl);
+            resp.sendRedirect(req.getContextPath() + "/cart.jsp");
         }
     }
 }

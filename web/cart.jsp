@@ -1,13 +1,11 @@
 <%@page contentType="text/html;charset=UTF-8" language="java" %>
 <%@taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@page import="java.util.Map, model.CartItem" %>
+<%@page import="java.util.Map, model.OrderDetail" %>
 <!DOCTYPE html>
 <html lang="vi">
     <head>
         <meta charset="UTF-8">
         <title>Giỏ hàng của bạn</title>
-
-        <!-- ✅ CSS bạn gửi -->
         <style>
             * {
                 margin:0;
@@ -84,7 +82,7 @@
                 font-weight:600;
                 color:#222;
             }
-            input[type="number"]{
+            input.qty-input {
                 width:66px;
                 padding:6px;
                 border:1px solid #ddd;
@@ -120,17 +118,9 @@
                 margin:12px 0;
                 font-size:0.95rem;
             }
-            .order-actions {
-                display:flex;
-                gap:12px;
-                margin-top:16px;
-                align-items:center;
-            }
             .continue {
                 margin-left:auto;
             }
-
-            /* Right summary */
             .summary-title {
                 font-size:1.15rem;
                 font-weight:700;
@@ -170,7 +160,10 @@
                 font-weight:700;
                 cursor:pointer;
             }
-
+            .checkout-full:disabled {
+                background:#ccc;
+                cursor:not-allowed;
+            }
             .empty {
                 text-align:center;
                 padding:54px 16px;
@@ -180,7 +173,6 @@
                 font-size:1.3rem;
                 margin-bottom:8px;
             }
-
             @media (max-width:900px){
                 .layout{
                     flex-direction:column;
@@ -194,13 +186,12 @@
     </head>
     <body>
         <%@ include file="partials/header.jsp" %>
-
         <%
-            Map<Integer, CartItem> cart = (Map<Integer, CartItem>) session.getAttribute("cart");
+            Map<Integer, OrderDetail> cart = (Map<Integer, OrderDetail>) session.getAttribute("cart");
             double total = 0;
             int totalQty = 0;
             if (cart != null) {
-                for (CartItem it : cart.values()) {
+                for (OrderDetail it : cart.values()) {
                     total += it.getSubtotal();
                     totalQty += it.getQuantity();
                 }
@@ -211,7 +202,7 @@
 
         <div class="page">
             <div class="layout">
-                <!-- LEFT: Cart detail -->
+                <!-- LEFT -->
                 <div class="left">
                     <h1>🛒 Giỏ hàng của bạn</h1>
 
@@ -221,99 +212,312 @@
                                 <h3>Giỏ hàng trống</h3>
                                 <p>Bạn chưa thêm sản phẩm nào vào giỏ.</p>
                                 <br>
-                                <a href="${pageContext.request.contextPath}/products?action=list" class="btn primary">Tiếp tục mua sắm</a>
+                                <a href="${pageContext.request.contextPath}/products?action=list" class="btn primary">
+                                    Tiếp tục mua sắm
+                                </a>
                             </div>
                         </c:when>
 
                         <c:otherwise>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th style="text-align:left;">Sản phẩm</th>
-                                        <th>Giá</th>
-                                        <th>Số lượng</th>
-                                        <th>Tổng</th>
-                                        <th>Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <c:forEach var="item" items="${sessionScope.cart.values()}">
+                            <form id="cartForm" method="post" action="${pageContext.request.contextPath}/cart" onsubmit="return false;">
+                                <input type="hidden" name="action" value="">
+                                <table>
+                                    <thead>
                                         <tr>
-                                            <td style="text-align:left;">
-                                                <div class="product-cell">
-                                                    <img src="${pageContext.request.contextPath}/${item.product.imagePath}" alt="${item.product.name}" class="product-thumb">
-                                                    <div>
-                                                        <div class="product-name">${item.product.name}</div>
-                                                        <div style="font-size:0.9rem; color:#666;">Mã: ${item.product.id}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td>${item.product.price}₫</td>
-                                            <td>
-                                                <form action="${pageContext.request.contextPath}/cart" method="post" style="display:inline-flex; gap:6px; align-items:center;">
-                                                    <input type="hidden" name="action" value="update"/>
-                                                    <input type="hidden" name="productId" value="${item.product.id}"/>
-                                                    <input type="number" name="quantity" min="1" value="${item.quantity}"/>
-                                                    <button class="btn ghost" type="submit">Cập nhật</button>
-                                                </form>
-                                            </td>
-                                            <td>${item.subtotal}₫</td>
-                                            <td>
-                                                <form action="${pageContext.request.contextPath}/cart" method="post">
-                                                    <input type="hidden" name="action" value="remove"/>
-                                                    <input type="hidden" name="productId" value="${item.product.id}"/>
-                                                    <button class="btn danger" type="submit">Xóa</button>
-                                                </form>
-                                            </td>
+                                            <th>
+                                                <input type="checkbox" id="selectAll" style="transform:scale(1.2); margin-right:4px;">
+                                                <label for="selectAll">Chọn tất cả</label>
+                                            </th>
+                                            <th>Giá</th>
+                                            <th>Số lượng</th>
+                                            <th>Tổng</th>
+                                            <th>Hành động</th>
                                         </tr>
-                                    </c:forEach>
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody id="cartBody">
+                                        <c:forEach var="item" items="${sessionScope.cart.values()}">
+                                            <tr id="item-row-${item.product.id}">
+                                                <td style="text-align:left;">
+                                                    <div class="product-cell">
+                                                        <input type="checkbox" class="item-checkbox"
+                                                               value="${item.product.id}" checked
+                                                               style="margin-right:8px; transform:scale(1.2);">
+                                                        <img src="${pageContext.request.contextPath}/${item.product.imagePath}"
+                                                             alt="${item.product.name}" class="product-thumb">
+                                                        <div>
+                                                            <div class="product-name">${item.product.name}</div>
+                                                            <div style="font-size:0.9rem; color:#666;">Mã: ${item.product.id}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="item-price" data-price="${item.product.price}">
+                                                    <span class="price-text"><script>document.write(new Intl.NumberFormat('vi-VN').format(${item.product.price}));</script>₫</span>
+                                                </td>
+                                                <td>
+                                                    <div style="display:inline-flex; align-items:center; gap:6px;">
+                                                        <button type="button" class="btn ghost qty-btn" data-action="minus"
+                                                                data-id="${item.product.id}">−</button>
+                                                        <input type="number" name="quantity_${item.product.id}"
+                                                               value="${item.quantity}" min="1" class="qty-input"
+                                                               data-id="${item.product.id}">
+                                                        <button type="button" class="btn ghost qty-btn" data-action="plus"
+                                                                data-id="${item.product.id}">+</button>
+                                                    </div>
+                                                </td>
+                                                <td class="item-subtotal" data-id="${item.product.id}">
+                                                    <span class="subtotal-text"><script>document.write(new Intl.NumberFormat('vi-VN').format(${item.subtotal}));</script>₫</span>
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="btn danger remove-btn"
+                                                            data-id="${item.product.id}">Xóa</button>
+                                                </td>
+                                            </tr>
+                                        </c:forEach>
+                                    </tbody>
+                                </table>
+                            </form>
 
                             <div class="promo">
                                 <strong>Khuyến mãi áp dụng:</strong><br>
-                                - Giảm 4% trên tổng đơn hàng (đã trừ thẳng vào giá).<br>
-                                - Tặng 01 bàn di chuột; miễn phí vận chuyển đèn toàn quốc.<br>
-                                - Hỗ trợ 1 đổi 1
+                                - Giảm 4% trên tổng đơn hàng.<br>
+                                - Tặng bàn di chuột, miễn phí vận chuyển.<br>
+                                - Hỗ trợ đổi trả 1:1.
                             </div>
 
                             <div style="display:flex; gap:12px; align-items:center; margin-top:12px;">
                                 <div class="continue" style="margin-left:auto;">
-                                    <a href="${pageContext.request.contextPath}/products?action=list" class="btn ghost">⬅ Tiếp tục mua sắm</a>
+                                    <a href="${pageContext.request.contextPath}/products?action=list" class="btn ghost">
+                                        ⬅ Tiếp tục mua sắm
+                                    </a>
                                 </div>
                             </div>
                         </c:otherwise>
                     </c:choose>
                 </div>
 
-                <!-- RIGHT: Short summary -->
+                <!-- RIGHT -->
                 <div class="right">
                     <div class="summary-title">Tóm tắt đơn hàng</div>
-                    <div class="summary-row">
-                        <span>Tổng số lượng</span>
-                        <span>${cartTotalQty}</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Tạm tính</span>
-                        <span>${cartTotal}₫</span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>Tổng cộng</span>
-                        <span>${cartTotal}₫</span>
-                    </div>
+                    <div class="summary-row"><span>Tổng số lượng</span><span id="totalQty">${cartTotalQty}</span></div>
+                    <div class="summary-row"><span>Tạm tính</span><span id="totalAmount"><script>document.write(new Intl.NumberFormat('vi-VN').format(${cartTotal}));</script>₫</span></div>
+                    <div class="summary-row total"><span>Tổng cộng</span><span id="grandTotal"><script>document.write(new Intl.NumberFormat('vi-VN').format(${cartTotal}));</script>₫</span></div>
 
-                    <div class="voucher">
-                        <label for="voucher">Nhập mã voucher</label>
-                        <input type="text" id="voucher" placeholder="Nhập mã khuyến mãi...">
-                    </div>
-
-                    <!-- Chuyển sang PaymentConfirmed.jsp -->
-                    <form action="${pageContext.request.contextPath}/payment" method="post" style="margin-top: 14px;">
-                        <button type="submit" class="checkout-full">Tiến hành thanh toán</button>
+                    <form action="${pageContext.request.contextPath}/payment" method="post" id="toPaymentForm" style="margin-top: 14px;">
+                        <div class="voucher">
+                            <label for="voucher">Nhập mã voucher</label>
+                            <input type="text" id="voucher" name="couponCode" placeholder="Nhập mã khuyến mãi...">
+                        </div>
+                        <button type="submit" class="checkout-full" id="checkoutBtn">Tiến hành thanh toán</button>
                     </form>
                 </div>
             </div>
         </div>
+
+        <script>
+            function formatVnd(n) {
+                return new Intl.NumberFormat('vi-VN').format(n) + '₫';
+            }
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const contextPath = "${pageContext.request.contextPath}";
+                const cartBody = document.getElementById('cartBody');
+                const selectAll = document.getElementById('selectAll');
+                const checkoutBtn = document.getElementById('checkoutBtn');
+
+                const totalQtyEl = document.getElementById('totalQty');
+                const totalAmountEl = document.getElementById('totalAmount');
+                const grandTotalEl = document.getElementById('grandTotal');
+
+                function log(...a) {
+                    console.debug('[CART]', ...a);
+                }
+
+                function getRows() {
+                    return Array.from(cartBody.querySelectorAll('tr[id^="item-row-"]'));
+                }
+
+                function updateCartTotals() {
+                    let totalQty = 0;
+                    let totalAmount = 0;
+                    getRows().forEach(row => {
+                        const checkbox = row.querySelector('.item-checkbox');
+                        if (!checkbox || !checkbox.checked)
+                            return;
+                        const qtyInput = row.querySelector('.qty-input');
+                        const priceCell = row.querySelector('.item-price');
+                        const price = parseFloat(priceCell.dataset.price);
+                        const qty = parseInt(qtyInput.value) || 0;
+                        totalQty += qty;
+                        totalAmount += price * qty;
+                    });
+                    totalQtyEl.textContent = totalQty;
+                    totalAmountEl.textContent = formatVnd(totalAmount);
+                    grandTotalEl.textContent = formatVnd(totalAmount);
+                    log('Totals recalculated:', {totalQty, totalAmount});
+                }
+
+                function syncSelectAll() {
+                    const allChecked = getRows().every(r => {
+                        const cb = r.querySelector('.item-checkbox');
+                        return cb && cb.checked;
+                    });
+                    selectAll.checked = allChecked;
+                    toggleCheckoutButton();
+                }
+
+                function toggleCheckoutButton() {
+                    const anyChecked = getRows().some(r => {
+                        const cb = r.querySelector('.item-checkbox');
+                        return cb && cb.checked;
+                    });
+                    checkoutBtn.disabled = !anyChecked;
+                }
+
+                function updateRowSubtotal(row) {
+                    const qtyInput = row.querySelector('.qty-input');
+                    const priceCell = row.querySelector('.item-price');
+                    const subtotalCell = row.querySelector('.item-subtotal .subtotal-text');
+                    const price = parseFloat(priceCell.dataset.price);
+                    const qty = parseInt(qtyInput.value) || 1;
+                    const subtotal = price * qty;
+                    subtotalCell.textContent = formatVnd(subtotal);
+                    log('Row subtotal updated', {id: row.id, qty, subtotal});
+                }
+
+                // Event delegation cho plus/minus, remove, checkbox, input change
+                cartBody.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('button');
+                    if (!btn)
+                        return;
+
+                    // Remove
+                    if (btn.classList.contains('remove-btn')) {
+                        const id = btn.dataset.id;
+                        if (!confirm('Bạn có chắc muốn xóa sản phẩm này?'))
+                            return;
+                        try {
+                            const fd = new URLSearchParams({action: 'remove', productId: id});
+                            const res = await fetch(contextPath + '/cart', {
+                                method: 'POST',
+                                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                                body: fd
+                            });
+                            const data = await res.json().catch(() => ({success: false}));
+                            if (data.success) {
+                                const row = document.getElementById('item-row-' + id);
+                                if (row)
+                                    row.remove();
+                                updateCartTotals();
+                                syncSelectAll();
+                            } else {
+                                alert(data.message || 'Không thể xóa.');
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            alert('Lỗi mạng.');
+                        }
+                        return;
+                    }
+
+                    // Plus / Minus
+                    if (btn.classList.contains('qty-btn')) {
+                        const id = btn.dataset.id;
+                        const row = document.getElementById('item-row-' + id);
+                        if (!row) {
+                            log('Row not found for id', id);
+                            return;
+                        }
+                        const input = row.querySelector('.qty-input');
+                        let val = parseInt(input.value) || 1;
+                        if (btn.dataset.action === 'plus')
+                            val++;
+                        else if (btn.dataset.action === 'minus' && val > 1)
+                            val--;
+                        input.value = val;
+                        updateRowSubtotal(row);
+                        updateCartTotals();
+
+                        // Gửi server (async nhưng UI vẫn cập nhật)
+                        try {
+                            const fd = new URLSearchParams({action: 'update', productId: id, quantity: val});
+                            const res = await fetch(contextPath + '/cart', {
+                                method: 'POST',
+                                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                                body: fd
+                            });
+                            const data = await res.json().catch(() => ({success: false}));
+                            if (!data.success) {
+                                alert(data.message || 'Cập nhật server thất bại. Giỏ hàng sẽ được đồng bộ lại.');
+                                location.reload();
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            alert('Lỗi kết nối. Trang sẽ reload để đồng bộ.');
+                            location.reload();
+                        }
+                    }
+                });
+
+                cartBody.addEventListener('change', (e) => {
+                    const target = e.target;
+                    // Checkbox item
+                    if (target.classList.contains('item-checkbox')) {
+                        syncSelectAll();
+                        updateCartTotals();
+                    }
+                    // Sửa trực tiếp số lượng
+                    if (target.classList.contains('qty-input')) {
+                        const row = target.closest('tr');
+                        if (!row)
+                            return;
+                        let val = parseInt(target.value) || 1;
+                        if (val < 1) {
+                            val = 1;
+                            target.value = val;
+                        }
+                        updateRowSubtotal(row);
+                        updateCartTotals();
+
+                        const id = target.dataset.id;
+                        // Async update server
+                        (async () => {
+                            try {
+                                const fd = new URLSearchParams({action: 'update', productId: id, quantity: val});
+                                const res = await fetch(contextPath + '/cart', {
+                                    method: 'POST',
+                                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                                    body: fd
+                                });
+                                const data = await res.json().catch(() => ({success: false}));
+                                if (!data.success) {
+                                    alert(data.message || 'Cập nhật số lượng thất bại.');
+                                    location.reload();
+                                }
+                            } catch (err) {
+                                console.error(err);
+                                alert('Lỗi cập nhật server.');
+                                location.reload();
+                            }
+                        })();
+                    }
+                });
+
+                // Chọn tất cả
+                selectAll.addEventListener('change', () => {
+                    getRows().forEach(r => {
+                        const cb = r.querySelector('.item-checkbox');
+                        if (cb)
+                            cb.checked = selectAll.checked;
+                    });
+                    toggleCheckoutButton();
+                    updateCartTotals();
+                });
+
+                // Khởi tạo
+                updateCartTotals();
+                syncSelectAll();
+            });
+        </script>
 
         <%@ include file="partials/footer.jsp" %>
     </body>

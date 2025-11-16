@@ -12,20 +12,22 @@ public class User {
     private String email;
     private String password;
     private String role;
+    private String phoneNumber;
 
     public User() {
     }
 
-    public User(int id, String fullName, String email, String password, String role) {
+    public User(int id, String fullName, String email, String password, String role, String phoneNumber) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
         this.password = password;
         this.role = role;
+        this.phoneNumber = phoneNumber;
     }
 
-    public User(String fullName, String email, String password, String role) {
-        this(0, fullName, email, password, role);
+    public User(String fullName, String email, String password, String role, String phoneNumber) {
+        this(0, fullName, email, password, role, phoneNumber);
     }
 
     public int getId() {
@@ -38,6 +40,14 @@ public class User {
 
     public String getFullName() {
         return fullName;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
     }
 
     public void setFullName(String fullName) {

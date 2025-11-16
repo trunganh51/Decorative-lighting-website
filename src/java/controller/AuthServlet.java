@@ -12,7 +12,6 @@ import jakarta.servlet.http.*;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @WebServlet(name = "AuthServlet", urlPatterns = "/auth")
@@ -177,7 +176,7 @@ public class AuthServlet extends HttpServlet {
                 return;
             }
 
-            User u = new User(fullName, email, password, "user");
+            User u = new User(fullName, email, password, "user", null);
             if (userDAO.register(u)) {
                 otpDAO.deleteOTP(email);
                 resp.sendRedirect(req.getContextPath() + "/auth?action=login");

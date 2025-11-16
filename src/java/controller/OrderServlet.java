@@ -2,7 +2,6 @@ package controller;
 
 import dao.OrderDAO;
 import dao.OrderDetailDAO;
-import model.CartItem;
 import model.Order;
 import model.OrderDetail;
 import model.User;
@@ -20,6 +19,7 @@ import java.util.Map;
 
 @WebServlet(name = "OrderServlet", urlPatterns = "/orders")
 public class OrderServlet extends HttpServlet {
+
     private final OrderDAO orderDAO = new OrderDAO();
     private final OrderDetailDAO orderDetailDAO = new OrderDetailDAO();
 
@@ -36,15 +36,11 @@ public class OrderServlet extends HttpServlet {
             return;
         }
 
-        // 🧾 Danh sách đơn hàng của người dùng
         if (action == null || action.equals("list")) {
             List<Order> orders = orderDAO.getOrdersByUser(user.getId());
             req.setAttribute("orders", orders);
             req.getRequestDispatcher("order_list.jsp").forward(req, resp);
-        }
-
-        // 🔍 Xem chi tiết đơn hàng
-        else if (action.equals("detail")) {
+        } else if (action.equals("detail")) {
             int orderId = Integer.parseInt(req.getParameter("id"));
             Order order = orderDAO.getOrderById(orderId);
             List<OrderDetail> details = orderDetailDAO.getDetailsByOrderId(orderId);
@@ -52,10 +48,7 @@ public class OrderServlet extends HttpServlet {
             req.setAttribute("order", order);
             req.setAttribute("details", details);
             req.getRequestDispatcher("order_detail.jsp").forward(req, resp);
-        }
-
-        // 👑 Admin xem toàn bộ đơn hàng
-        else if (action.equals("admin")) {
+        } else if (action.equals("admin")) {
             List<Order> orders = orderDAO.getAllOrders();
             req.setAttribute("orders", orders);
             req.getRequestDispatcher("admin_orders.jsp").forward(req, resp);
@@ -76,11 +69,18 @@ public class OrderServlet extends HttpServlet {
             return;
         }
 
-        // 🛒 Đặt hàng từ giỏ hàng
         if ("checkout".equals(action)) {
             @SuppressWarnings("unchecked")
-            Map<Integer, CartItem> cart = (Map<Integer, CartItem>) session.getAttribute("cart");
-            String address = req.getParameter("address");
+            Map<Integer, OrderDetail> cart = (Map<Integer, OrderDetail>) session.getAttribute("cart");
+
+            String receiverName = param(req, "receiverName", user.getFullName() != null ? user.getFullName() : "");
+            String phone = param(req, "phone", "");
+            int provinceId = parseIntOrDefault(req.getParameter("provinceId"), 1);
+            String address = param(req, "address", "");
+            String shippingMethod = param(req, "shippingMethod", "standard");
+            int paymentId = parseIntOrDefault(req.getParameter("paymentId"), 2); // 2 = COD
+            String note = param(req, "note", "");
+            String couponCode = param(req, "couponCode", "");
 
             if (cart == null || cart.isEmpty()) {
                 req.setAttribute("error", "Giỏ hàng của bạn đang trống!");
@@ -88,23 +88,23 @@ public class OrderServlet extends HttpServlet {
                 return;
             }
 
-            double total = cart.values().stream().mapToDouble(CartItem::getSubtotal).sum();
             Order order = new Order();
             order.setUserId(user.getId());
-            order.setTotalPrice(total);
+            order.setPaymentId(paymentId);
+            order.setReceiverName(receiverName);
+            order.setPhone(phone);
+            order.setProvinceId(provinceId);
+            order.setAddress(address);
+            order.setShippingMethod(shippingMethod);
+            order.setNote(note);
+            order.setCouponCode(couponCode);
             order.setStatus("Chờ duyệt");
-            order.setShippingAddress(address);
 
-            int orderId = orderDAO.insert(order);
+            // NEW: Tạo đơn + chi tiết trong 1 transaction
+            int orderId = orderDAO.insertWithDetails(order, cart);
 
             if (orderId > 0) {
-                for (CartItem item : cart.values()) {
-                    orderDetailDAO.insertOrderDetail(orderId,
-                            item.getProduct().getId(),
-                            item.getQuantity(),
-                            item.getProduct().getPrice());
-                }
-
+                // Xoá giỏ hàng và chuyển về danh sách
                 session.removeAttribute("cart");
                 session.setAttribute("cartSize", 0);
 
@@ -113,40 +113,33 @@ public class OrderServlet extends HttpServlet {
                 req.setAttribute("error", "Đặt hàng thất bại, vui lòng thử lại!");
                 req.getRequestDispatcher("cart.jsp").forward(req, resp);
             }
-        }
-
-      
-
-        // ✅ Người dùng xác nhận đã nhận hàng
-        else if ("confirm".equals(action)) {
+        } else if ("confirm".equals(action)) {
             int orderId = Integer.parseInt(req.getParameter("orderId"));
             orderDAO.updateOrderStatus(orderId, "Đã giao");
             resp.sendRedirect(req.getContextPath() + "/orders?action=list");
-        }
-
-        // ❌ Người dùng huỷ đơn hàng → chỉ cập nhật trạng thái
-        else if ("cancel".equals(action)) {
+        } else if ("cancel".equals(action)) {
             int orderId = Integer.parseInt(req.getParameter("orderId"));
-            orderDAO.updateOrderStatus(orderId, "Đã huỷ");
+            orderDAO.updateOrderStatus(orderId, "Đã hủy");
             resp.sendRedirect(req.getContextPath() + "/orders?action=list&msg=cancelled");
-        }
-
-        // 🔁 Đặt lại đơn hàng: XÓA ĐƠN CŨ + TẠO LẠI ĐƠN MỚI
-        else if ("reorder".equals(action)) {
+        } else if ("reorder".equals(action)) {
             int oldOrderId = Integer.parseInt(req.getParameter("orderId"));
             Order oldOrder = orderDAO.getOrderById(oldOrderId);
             List<OrderDetail> oldDetails = orderDetailDAO.getDetailsByOrderId(oldOrderId);
 
-            if (oldOrder != null && !oldDetails.isEmpty()) {
-                // Xóa đơn cũ trước
+            if (oldOrder != null && oldDetails != null && !oldDetails.isEmpty()) {
                 orderDetailDAO.deleteDetailsByOrderId(oldOrderId);
                 orderDAO.deleteOrder(oldOrderId);
 
-                // Tạo đơn mới
                 Order newOrder = new Order();
                 newOrder.setUserId(user.getId());
-                newOrder.setShippingAddress(oldOrder.getShippingAddress());
-                newOrder.setTotalPrice(oldOrder.getTotalPrice());
+                newOrder.setPaymentId(oldOrder.getPaymentId() > 0 ? oldOrder.getPaymentId() : 2);
+                newOrder.setReceiverName(oldOrder.getReceiverName());
+                newOrder.setPhone(oldOrder.getPhone());
+                newOrder.setProvinceId(oldOrder.getProvinceId());
+                newOrder.setAddress(oldOrder.getAddress());
+                newOrder.setShippingMethod(oldOrder.getShippingMethod() != null ? oldOrder.getShippingMethod() : "standard");
+                newOrder.setNote(oldOrder.getNote());
+                newOrder.setCouponCode(oldOrder.getCouponCode());
                 newOrder.setStatus("Chờ duyệt");
 
                 int newOrderId = orderDAO.insert(newOrder);
@@ -169,14 +162,24 @@ public class OrderServlet extends HttpServlet {
                 req.setAttribute("error", "Đơn hàng không tồn tại hoặc rỗng.");
                 req.getRequestDispatcher("order_list.jsp").forward(req, resp);
             }
-        }
-
-        // 🗑 Xóa triệt để đơn (tùy chọn)
-        else if ("delete".equals(action)) {
+        } else if ("delete".equals(action)) {
             int orderId = Integer.parseInt(req.getParameter("orderId"));
             orderDetailDAO.deleteDetailsByOrderId(orderId);
             orderDAO.deleteOrder(orderId);
             resp.sendRedirect(req.getContextPath() + "/orders?action=list&deleted=1");
+        }
+    }
+
+    private static String param(HttpServletRequest req, String name, String def) {
+        String v = req.getParameter(name);
+        return (v == null || v.trim().isEmpty()) ? def : v.trim();
+    }
+
+    private static int parseIntOrDefault(String s, int def) {
+        try {
+            return Integer.parseInt(s);
+        } catch (Exception e) {
+            return def;
         }
     }
 }

@@ -1,77 +1,56 @@
 package model;
 
+import java.util.Date;
+
+/**
+ * Model OrderDetail khớp với bảng `order_details` (Full v3).
+ */
 public class OrderDetail {
-    private int detailId;
-    private int orderId;
-    private int productId;
-    private int quantity;
-    private double price;
+    private int orderDetailId; // order_detail_id
+    private int orderId;       // order_id
+    private int productId;     // product_id
+    private int quantity;      // quantity
+    private double price;      // price
 
-    private Product product; // có thể lấy thêm thông tin sản phẩm nếu cần hiển thị
+    private Date createdAt;    // created_at
+    private Date updatedAt;    // updated_at
 
-    // ===== Constructors =====
-    public OrderDetail() {
-    }
+    private Product product;   // optional: để hiển thị tên ảnh, v.v.
 
-    public OrderDetail(int detailId, int orderId, int productId, int quantity, double price) {
-        this.detailId = detailId;
+    public OrderDetail() {}
+
+    public OrderDetail(int orderDetailId, int orderId, int productId, int quantity, double price) {
+        this.orderDetailId = orderDetailId;
         this.orderId = orderId;
         this.productId = productId;
         this.quantity = quantity;
         this.price = price;
     }
 
-    // ===== Getter & Setter =====
-    public int getDetailId() {
-        return detailId;
-    }
+    // Getters & Setters
+    public int getOrderDetailId() { return orderDetailId; }
+    public void setOrderDetailId(int orderDetailId) { this.orderDetailId = orderDetailId; }
 
-    public void setDetailId(int detailId) {
-        this.detailId = detailId;
-    }
+    public int getOrderId() { return orderId; }
+    public void setOrderId(int orderId) { this.orderId = orderId; }
 
-    public int getOrderId() {
-        return orderId;
-    }
+    public int getProductId() { return productId; }
+    public void setProductId(int productId) { this.productId = productId; }
 
-    public void setOrderId(int orderId) {
-        this.orderId = orderId;
-    }
+    public int getQuantity() { return quantity; }
+    public void setQuantity(int quantity) { this.quantity = quantity; }
 
-    public int getProductId() {
-        return productId;
-    }
+    public double getPrice() { return price; }
+    public void setPrice(double price) { this.price = price; }
 
-    public void setProductId(int productId) {
-        this.productId = productId;
-    }
+    public Date getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Date createdAt) { this.createdAt = createdAt; }
 
-    public int getQuantity() {
-        return quantity;
-    }
+    public Date getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(Date updatedAt) { this.updatedAt = updatedAt; }
 
-    public void setQuantity(int quantity) {
-        this.quantity = quantity;
-    }
+    public Product getProduct() { return product; }
+    public void setProduct(Product product) { this.product = product; }
 
-    public double getPrice() {
-        return price;
-    }
-
-    public void setPrice(double price) {
-        this.price = price;
-    }
-
-    public Product getProduct() {
-        return product;
-    }
-
-    public void setProduct(Product product) {
-        this.product = product;
-    }
-
-    // ===== Tổng tiền cho từng dòng =====
-    public double getSubtotal() {
-        return price * quantity;
-    }
+    public double getSubtotal() { return price * quantity; }
 }

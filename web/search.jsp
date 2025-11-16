@@ -1,284 +1,168 @@
-<%@page contentType="text/html;charset=UTF-8" language="java" %>
-<%@taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ page contentType="text/html;charset=UTF-8" pageEncoding="UTF-8" isELIgnored="false" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Kết quả tìm kiếm</title>
+    <title>Web bán đèn trang trí</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root{
+            --bg-color:#f8f9fa;
+            --text-color:#333;
+            --muted:#556;
+            --card-bg:#fff;
+            --shadow:rgba(0,0,0,0.1);
+            --heading:#2c3e50;
+            --primary:#007bff;
+            --success:#28a745;
+            --danger:#e74c3c;
+            --border:#dcdcdc;
+            --input-bg:#fff;
+            --input-text:#222;
+            --input-border:#cfcfcf;
         }
-        
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
-            line-height: 1.6;
+        body.dark{
+            --bg-color:#121416;
+            --text-color:#e9e9e9;
+            --muted:#a7b0c0;
+            --card-bg:#1a1f25;
+            --shadow:rgba(0,0,0,0.4);
+            --heading:#cde1ff;
+            --primary:#4ea3ff;
+            --success:#48d06b;
+            --danger:#ff6b6b;
+            --border:#2b323b;
+            --input-bg:#11161c;
+            --input-text:#e9e9e9;
+            --input-border:#2c3440;
         }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 30px 20px;
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Arial',sans-serif;background:var(--bg-color);color:var(--text-color);transition:background .3s,color .3s}
+        .container{max-width:1400px;margin:0 auto;padding:20px}
+        h2{color:var(--heading);text-align:center;margin-bottom:22px;font-size:2rem}
+        .products-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:10px;flex-wrap:wrap}
+        /* Grid */
+        .product-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+        .product-card{background:var(--card-bg);border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 10px var(--shadow);transition:transform .25s;border:1px solid var(--border);}
+        .product-card:hover{transform:translateY(-5px);}
+        .product-card img{width:100%;height:180px;object-fit:cover;border-radius:8px;margin-bottom:12px;}
+        .product-card h3{font-size:1.05rem;margin-bottom:6px;color:var(--text-color);}
+        .product-card .price{color:var(--primary);font-weight:bold;font-size:1.06rem;margin-bottom:6px;}
+        .stock{font-size:.9rem;margin-bottom:10px;color:var(--muted);}
+        .stock.in{color:var(--success);}
+        .stock.out{color:var(--danger);}
+        .button{background:var(--primary);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;text-decoration:none;display:inline-block;margin:5px;transition:transform .2s,opacity .2s;}
+        .button:hover{transform:translateY(-2px);}
+        .button.secondary{background:#6c757d;}
+        .button.secondary:hover{opacity:.9;}
+        .pagination{text-align:center;margin:24px 0;}
+        .pagination .button{margin:0 2px;}
+        .pagination .button.active{background:#28a745;}
+        .pagination input{width:70px;padding:8px;border-radius:6px;border:1px solid var(--input-border);background:var(--input-bg);color:var(--input-text);}
+        .theme-toggle{position:fixed;bottom:20px;right:20px;background:#ffc107;color:#000;border:none;padding:10px 15px;border-radius:10px;cursor:pointer;font-weight:700;box-shadow:0 2px 8px var(--shadow);}
+        .theme-toggle:hover{filter:brightness(.95);}
+        @media (max-width:992px){
+            .product-grid{grid-template-columns:repeat(2,1fr);}
         }
-        
-        h2 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 30px;
-            font-size: 2.2rem;
-        }
-        
-        .search-info {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        
-        .search-keyword {
-            color: #007bff;
-            font-weight: bold;
-        }
-        
-        .search-count {
-            color: #28a745;
-            font-weight: bold;
-        }
-        
-        .search-actions {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .clean-btn {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: background-color 0.3s ease;
-        }
-        
-        .clean-btn:hover {
-            background-color: #545b62;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        .product-card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-        
-        .product-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .product-card img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin-bottom: 15px;
-        }
-        
-        .product-card h3 {
-            margin-bottom: 10px;
-            color: #2c3e50;
-            font-size: 1.1rem;
-        }
-        
-        .product-card .price {
-            color: #007bff;
-            font-weight: bold;
-            font-size: 1.1rem;
-            margin-bottom: 15px;
-        }
-        
-        .button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            margin: 3px;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
-        }
-        
-        .button:hover {
-            background-color: #0056b3;
-            text-decoration: none;
-            color: white;
-        }
-        
-        .button.secondary {
-            background-color: #6c757d;
-        }
-        
-        .button.secondary:hover {
-            background-color: #545b62;
-        }
-        
-        .no-results {
-            background: white;
-            padding: 60px 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .no-results h3 {
-            color: #2c3e50;
-            font-size: 1.5rem;
-            margin-bottom: 15px;
-        }
-        
-        .no-results p {
-            color: #666;
-            margin-bottom: 30px;
-        }
-        
-        .suggestions {
-            text-align: left;
-            max-width: 500px;
-            margin: 30px auto;
-        }
-        
-        .suggestions h4 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-        }
-        
-        .suggestions ul {
-            list-style: none;
-            padding: 0;
-        }
-        
-        .suggestions li {
-            margin-bottom: 8px;
-            padding-left: 20px;
-            position: relative;
-        }
-        
-        .suggestions li:before {
-            content: '•';
-            color: #007bff;
-            position: absolute;
-            left: 0;
-        }
-        
-        .back-section {
-            text-align: center;
-            margin-top: 40px;
-        }
-        
-        @media (max-width: 768px) {
-            .product-grid {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 15px;
-            }
+        @media (max-width:576px){
+            .product-grid{grid-template-columns:1fr;}
         }
     </style>
 </head>
 <body>
 <%@ include file="partials/header.jsp" %>
-
 <div class="container">
-    <h2>🔍 Kết quả tìm kiếm</h2>
 
-    <!-- Search Info -->
-    <c:if test="${not empty searchKeyword}">
-        <div class="search-info">
-            <p>
-                Kết quả tìm kiếm cho: <span class="search-keyword">"${searchKeyword}"</span>
-                - Tìm thấy <span class="search-count">${not empty products ? products.size() : 0}</span> sản phẩm
-            </p>
+
+    <div class="product-grid">
+        <c:forEach var="p" items="${products}">
+            <div class="product-card">
+                <img src="${pageContext.request.contextPath}/${p.imagePath}" alt="${p.name}">
+                <h3>${p.name}</h3>
+                <p class="price">${p.price}₫</p>
+                <c:set var="stockClass" value="${p.quantity > 0 ? 'stock in' : 'stock out'}"/>
+                <p class="${stockClass}">Kho: ${p.quantity}</p>
+                <c:choose>
+                    <c:when test="${p.quantity > 0}">
+                        <button type="button" class="button add-to-cart-btn" data-product-id="${p.id}">🛒 Thêm vào giỏ</button>
+                    </c:when>
+                    <c:otherwise>
+                        <button type="button" class="button" disabled style="opacity:.7;cursor:not-allowed;">Hết hàng</button>
+                    </c:otherwise>
+                </c:choose>
+                <a href="${pageContext.request.contextPath}/products?action=detail&id=${p.id}" class="button secondary">Xem chi tiết</a>
+            </div>
+        </c:forEach>
+        <c:if test="${fn:length(products)==0}">
+            <div style="grid-column:1/-1;text-align:center;padding:36px;color:#888;">Không tìm thấy sản phẩm nào.</div>
+        </c:if>
+    </div>
+
+    <!-- PHÂN TRANG -->
+    <c:if test="${totalPages > 1}">
+        <div class="pagination">
+            <c:if test="${currentPage > 1}">
+                <a href="?action=list&page=1" class="button">« Đầu</a>
+                <a href="?action=list&page=${currentPage - 1}" class="button">‹ Trước</a>
+            </c:if>
+            <c:forEach begin="1" end="${totalPages}" var="pageNum">
+                <a href="?action=list&page=${pageNum}" class="button ${pageNum == currentPage ? 'active' : ''}">${pageNum}</a>
+            </c:forEach>
+            <c:if test="${currentPage < totalPages}">
+                <a href="?action=list&page=${currentPage + 1}" class="button">Tiếp ›</a>
+                <a href="?action=list&page=${totalPages}" class="button">Cuối »</a>
+            </c:if>
+            <form action="" method="get" style="display:inline-block;margin-left:15px;">
+                <input type="hidden" name="action" value="list"/>
+                <label for="goPage" style="margin-right:6px;">Đến trang:</label>
+                <input type="number" name="page" id="goPage" min="1" max="${totalPages}" required value="${currentPage}" style="width:60px;">
+                <button type="submit" class="button">Đi</button>
+            </form>
         </div>
     </c:if>
 
-    <!-- Actions -->
-    <div class="search-actions">
-        <a href="${pageContext.request.contextPath}/products?action=list" class="clean-btn">
-            🧹 Xem tất cả sản phẩm
-        </a>
-    </div>
-
-    <!-- Results -->
-    <c:choose>
-        <c:when test="${not empty products}">
-            <div class="product-grid">
-                <c:forEach var="p" items="${products}">
-                    <div class="product-card">
-                        <img src="${pageContext.request.contextPath}/${p.imagePath}" alt="${p.name}" />
-                        <h3>${p.name}</h3>
-                        <p class="price">${p.price}₫</p>
-                        
-                        <form action="${pageContext.request.contextPath}/cart" method="post" style="display: inline;">
-                            <input type="hidden" name="action" value="add" />
-                            <input type="hidden" name="productId" value="${p.id}" />
-                            <button type="submit" class="button">🛒 Thêm vào giỏ</button>
-                        </form>
-                        
-                        <a href="${pageContext.request.contextPath}/products?action=detail&id=${p.id}" 
-                           class="button secondary">Chi tiết</a>
-                    </div>
-                </c:forEach>
-            </div>
-        </c:when>
-        
-        <c:otherwise>
-            <div class="no-results">
-                <h3>Không tìm thấy sản phẩm</h3>
-                <p>Rất tiếc, không có sản phẩm nào phù hợp với từ khóa tìm kiếm.</p>
-                
-                <div class="suggestions">
-                    <h4>Gợi ý:</h4>
-                    <ul>
-                        <li>Kiểm tra lại chính tả</li>
-                        <li>Thử từ khóa ngắn gọn hơn</li>
-                        <li>Tìm theo danh mục sản phẩm</li>
-                        <li>Tìm theo thương hiệu</li>
-                    </ul>
-                </div>
-                
-                <a href="${pageContext.request.contextPath}/products?action=list" class="button">
-                    🏠 Về trang chủ
-                </a>
-            </div>
-        </c:otherwise>
-    </c:choose>
-
-    <div class="back-section">
-        <a href="${pageContext.request.contextPath}/products?action=list" class="button secondary">
-            ⬅ Quay lại danh sách sản phẩm
-        </a>
-    </div>
 </div>
-
+<button id="themeToggle" class="theme-toggle">🌞 Chế độ sáng</button>
 <%@ include file="partials/footer.jsp" %>
+
+<script>
+    // Dark/Light mode
+    const themeBtn=document.getElementById('themeToggle');
+    function applySavedTheme(){
+        const saved=localStorage.getItem('theme');
+        const isDark = saved==='dark';
+        if(isDark){ document.body.classList.add('dark'); themeBtn.textContent='🌙 Chế độ tối'; }
+        else{ document.body.classList.remove('dark'); themeBtn.textContent='🌞 Chế độ sáng'; }
+    }
+    applySavedTheme();
+    themeBtn.addEventListener('click',()=>{
+        document.body.classList.toggle('dark');
+        const dark=document.body.classList.contains('dark');
+        localStorage.setItem('theme',dark?'dark':'light');
+        themeBtn.textContent=dark?'🌙 Chế độ tối':'🌞 Chế độ sáng';
+    });
+
+    // Add to cart (AJAX)
+    document.addEventListener('DOMContentLoaded',function(){
+        document.querySelectorAll('.add-to-cart-btn').forEach(btn=>{
+            btn.addEventListener('click',async function(e){
+                e.preventDefault();
+                const id=this.dataset.productId;
+                this.disabled=true;
+                try{
+                    const res=await fetch('${pageContext.request.contextPath}/cart',{
+                        method:'POST',
+                        headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'},
+                        body:new URLSearchParams({action:'add',productId:id,quantity:1})
+                    });
+                    const result=await res.json();
+                    if(result.success){ alert("Đã thêm vào giỏ hàng!"); }
+                    else{ alert(result.message||"Không thể thêm sản phẩm"); }
+                }catch(err){ console.error(err); }
+                finally{ this.disabled=false; }
+            });
+        });
+    });
+</script>
 </body>
 </html>
