@@ -29,7 +29,7 @@ public class ProductServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // CRITICAL: Set encoding FIRST before reading any parameters
+        // Set encoding BEFORE reading any parameters
         req.setCharacterEncoding("UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("text/html; charset=UTF-8");
@@ -47,14 +47,16 @@ public class ProductServlet extends HttpServlet {
         }
     }
 
-    private void handleListAction(HttpServletRequest req, HttpServletResponse resp) 
+    private void handleListAction(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        
-        String categoryParam = req.getParameter("category");
-        int page = 1;
-        int pageSize = 6;
 
-        // Xác định trang hiện tại
+        String categoryParam = req.getParameter("category");
+        String parentParam = req.getParameter("parent");
+        String sortBy = req.getParameter("sortBy");
+
+        int page = 1;
+        int pageSize = 8;
+
         String pageParam = req.getParameter("page");
         if (pageParam != null && !pageParam.isEmpty()) {
             try {
@@ -65,34 +67,50 @@ public class ProductServlet extends HttpServlet {
         List<Product> products;
         int totalProducts;
 
-        if (categoryParam != null && !categoryParam.isEmpty()) {
-            // Lọc theo loại "trongnha", "ngoaitroi", hoặc ID
+        // Ưu tiên lọc theo danh mục cha nếu có tham số parent
+        if (parentParam != null && !parentParam.isEmpty()) {
+            try {
+                int parentId = Integer.parseInt(parentParam);
+                products = productDAO.getProductsByParentCategoryPagedSorted(parentId, page, pageSize, sortBy);
+                totalProducts = productDAO.countProductsByParentCategory(parentId);
+                req.setAttribute("selectedParent", parentId);
+            } catch (NumberFormatException e) {
+                // Fallback khi parent không hợp lệ
+                products = productDAO.getProductsByPageSorted(page, pageSize, sortBy);
+                totalProducts = productDAO.countProducts();
+            }
+        } else if (categoryParam != null && !categoryParam.isEmpty()) {
+            // Lọc theo alias hoặc id danh mục con
             switch (categoryParam.toLowerCase()) {
                 case "trongnha" -> {
-                    products = productDAO.getProductsByParentCategoryPaged(1, page, pageSize);
+                    products = productDAO.getProductsByParentCategoryPagedSorted(1, page, pageSize, sortBy);
                     totalProducts = productDAO.countProductsByParentCategory(1);
+                    req.setAttribute("selectedParentAlias", "trongnha");
                 }
                 case "ngoaitroi" -> {
-                    products = productDAO.getProductsByParentCategoryPaged(2, page, pageSize);
+                    products = productDAO.getProductsByParentCategoryPagedSorted(2, page, pageSize, sortBy);
                     totalProducts = productDAO.countProductsByParentCategory(2);
+                    req.setAttribute("selectedParentAlias", "ngoaitroi");
                 }
                 default -> {
                     try {
                         int catId = Integer.parseInt(categoryParam);
-                        products = productDAO.getProductsByCategoryPaged(catId, page, pageSize);
+                        products = productDAO.getProductsByCategoryPagedSorted(catId, page, pageSize, sortBy);
                         totalProducts = productDAO.countProductsByCategory(catId);
+                        req.setAttribute("selectedCategory", catId);
                     } catch (NumberFormatException e) {
-                        products = productDAO.getProductsByPage(page, pageSize);
+                        products = productDAO.getProductsByPageSorted(page, pageSize, sortBy);
                         totalProducts = productDAO.countProducts();
                     }
                 }
             }
         } else {
-            products = productDAO.getProductsByPage(page, pageSize);
+            // Danh sách tất cả sản phẩm (có sort)
+            products = productDAO.getProductsByPageSorted(page, pageSize, sortBy);
             totalProducts = productDAO.countProducts();
         }
 
-        // Top 5 sản phẩm bán chạy
+        // Top 5 sản phẩm bán chạy + danh sách danh mục
         List<Product> bestSellers = productDAO.getBestSellingProducts(5);
         List<Category> categories = categoryDAO.getAllCategories();
 
@@ -104,38 +122,64 @@ public class ProductServlet extends HttpServlet {
         req.setAttribute("currentPage", page);
         req.setAttribute("totalPages", totalPages);
         req.setAttribute("selectedCategory", categoryParam);
+        req.setAttribute("sortBy", sortBy);
 
         req.getRequestDispatcher("index.jsp").forward(req, resp);
     }
 
     /**
-     * ✅ Fixed Vietnamese search handling - consolidated and cleaned up
+     * Tìm kiếm nâng cao: keyword + minPrice + maxPrice + category + sortBy + phân trang
      */
-    private void handleSearchAction(HttpServletRequest req, HttpServletResponse resp) 
+    private void handleSearchAction(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        
+
         String keyword = req.getParameter("keyword");
-        
-        // Process Vietnamese text properly
+        String minPriceStr = req.getParameter("minPrice");
+        String maxPriceStr = req.getParameter("maxPrice");
+        String categoryStr = req.getParameter("category");
+        String sortBy = req.getParameter("sortBy");
+
+        int page = 1;
+        int pageSize = 8;
+        String pageParam = req.getParameter("page");
+        if (pageParam != null && !pageParam.isEmpty()) {
+            try {
+                page = Integer.parseInt(pageParam);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        Double minPrice = (minPriceStr != null && !minPriceStr.isEmpty()) ? Double.valueOf(minPriceStr) : null;
+        Double maxPrice = (maxPriceStr != null && !maxPriceStr.isEmpty()) ? Double.valueOf(maxPriceStr) : null;
+        Integer categoryId = (categoryStr != null && !categoryStr.isEmpty()) ? Integer.valueOf(categoryStr) : null;
+
         if (keyword != null && !keyword.isEmpty()) {
             keyword = normalizeVietnameseText(keyword);
             System.out.println("=== Processed search keyword: [" + keyword + "] ===");
         }
 
-        // Search products
-        List<Product> products = productDAO.searchProducts(keyword);
+        // Search products (có phân trang + sort)
+        List<Product> products = productDAO.searchProductsAdvanced(keyword, minPrice, maxPrice, categoryId, page, pageSize, sortBy);
+        int totalProducts = productDAO.countProductsAdvanced(keyword, minPrice, maxPrice, categoryId);
+        int totalPages = (int) Math.ceil((double) totalProducts / pageSize);
+
         List<Category> categories = categoryDAO.getAllCategories();
 
         req.setAttribute("products", products);
         req.setAttribute("categories", categories);
-        req.setAttribute("searchKeyword", keyword);
+        req.setAttribute("searchKeyword", keyword != null ? keyword : "");
+        req.setAttribute("currentPage", page);
+        req.setAttribute("totalPages", totalPages);
+        req.setAttribute("minPrice", minPriceStr);
+        req.setAttribute("maxPrice", maxPriceStr);
+        req.setAttribute("selectedCategory", categoryStr);
+        req.setAttribute("sortBy", sortBy);
 
         req.getRequestDispatcher("search.jsp").forward(req, resp);
     }
 
-    private void handleDetailAction(HttpServletRequest req, HttpServletResponse resp) 
+    private void handleDetailAction(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        
+
         String idParam = req.getParameter("id");
         if (idParam != null) {
             try {
@@ -158,27 +202,26 @@ public class ProductServlet extends HttpServlet {
     }
 
     /**
-     * ✅ Consolidated Vietnamese text normalization
-     * Uses Java's built-in Normalizer for proper Unicode handling
+     * Chuẩn hoá tiếng Việt cho keyword
      */
     private String normalizeVietnameseText(String text) {
         if (text == null || text.isEmpty()) {
             return text;
         }
-        
+
         // Step 1: Trim whitespace
         text = text.trim();
-        
+
         // Step 2: Unicode normalization (NFC form for Vietnamese)
         text = Normalizer.normalize(text, Normalizer.Form.NFC);
-        
+
         // Step 3: Remove clearly invalid characters while preserving Vietnamese
         // Keep letters, numbers, spaces, hyphens, underscores, dots
         text = text.replaceAll("[^\\p{L}\\p{N}\\s\\-_.]", "");
-        
+
         // Step 4: Normalize whitespace
         text = text.replaceAll("\\s+", " ").trim();
-        
+
         return text;
     }
 }

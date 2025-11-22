@@ -4,104 +4,143 @@
 <head>
     <meta charset="UTF-8">
     <title>Giới thiệu</title>
+    <!-- Dùng cùng font với header (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* Sử dụng cùng hệ biến của header (đã được define trong header),
+           đồng thời có fallback nếu header chưa load (hiếm) */
+        :root {
+            --gold: var(--gold, #d4af37);
+            --gold-soft: var(--gold-soft, #e6c763);
+            --text-dark: var(--text-dark, #1a1a1a);
+            --text-muted: var(--text-muted, #666);
+            --bg-white: var(--bg-white, #fff);
+            --bg-soft: var(--bg-soft, #fafafa);
+            --border: var(--border, #e6e6e6);
+            --radius-sm: var(--radius-sm, 8px);
+            --radius-md: var(--radius-md, 12px);
+            --shadow: var(--shadow, 0 8px 24px rgba(0,0,0,0.06));
+            --focus-ring: var(--focus-ring, 0 0 0 3px rgba(212,175,55,0.35));
+            --font-main: var(--font-main, 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+            --transition: var(--transition, .25s ease);
         }
-        
+
+        /* Reset tối giản, không phá header */
+        html, body {
+            height: 100%;
+        }
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f8f9fa;
-            color: #333;
+            font-family: var(--font-main);
+            background-color: var(--bg-soft);
+            color: var(--text-dark);
             line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-        
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 40px 20px;
         }
-        
+
         h2 {
             text-align: center;
-            color: #2c3e50;
-            font-size: 2.5rem;
-            margin-bottom: 30px;
+            color: var(--text-dark);
+            font-size: 2.2rem;
+            margin-bottom: 28px;
+            letter-spacing: .3px;
         }
-        
+
         .intro-text {
             text-align: center;
-            color: #666;
-            font-size: 1.1rem;
-            max-width: 800px;
-            margin: 0 auto 50px;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 820px;
+            margin: 0 auto 44px;
         }
-        
+
         .category-container {
             display: flex;
-            gap: 30px;
+            gap: 28px;
             justify-content: center;
             flex-wrap: wrap;
         }
-        
+
         .category-card {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 24px;
             width: 450px;
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
+            box-shadow: var(--shadow);
+            transition: transform var(--transition), box-shadow var(--transition);
         }
-        
+
         .category-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-6px);
+            box-shadow: 0 14px 40px rgba(0,0,0,0.08);
         }
-        
+
         .category-card img {
             width: 100%;
             height: 250px;
             object-fit: cover;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            border-radius: calc(var(--radius-md) - 4px);
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
         }
-        
+
         .category-card h3 {
-            color: #2c3e50;
-            font-size: 1.4rem;
-            margin-bottom: 15px;
+            color: var(--text-dark);
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            font-weight: 600;
         }
-        
+
         .category-card p {
-            color: #666;
-            margin-bottom: 20px;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            font-size: 0.98rem;
         }
-        
+
+        /* Nút chủ đạo đồng bộ header */
         .button {
-            background-color: #007bff;
-            color: white;
-            padding: 12px 25px;
+            background-color: var(--gold);
+            color: #fff;
+            padding: 10px 20px;
             border: none;
-            border-radius: 5px;
+            border-radius: 999px;
             text-decoration: none;
             display: inline-block;
-            transition: background-color 0.3s ease;
+            font-weight: 600;
+            letter-spacing: .3px;
+            transition: filter var(--transition), background-color var(--transition), transform .15s ease;
         }
-        
         .button:hover {
-            background-color: #0056b3;
+            background-color: var(--gold-soft);
+            filter: brightness(1.02);
+            transform: translateY(-1px);
         }
-        
-        @media (max-width: 768px) {
+        .button:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 992px) {
             .category-card {
                 width: 100%;
+                max-width: 520px;
             }
-            
-            h2 {
-                font-size: 2rem;
-            }
+            h2 { font-size: 2rem; }
+        }
+        @media (max-width: 640px) {
+            .container { padding: 28px 16px; }
+            .category-card img { height: 210px; }
+            .intro-text { font-size: 1rem; }
         }
     </style>
 </head>

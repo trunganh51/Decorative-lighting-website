@@ -1,19 +1,15 @@
 package filter;
 
 import jakarta.servlet.*;
-import jakarta.servlet.annotation.WebFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 
 /**
  * Filter thiết lập UTF-8 cho request/response mà không ghi đè Content-Type của
  * các tài nguyên binary (PDF, ảnh, v.v.).
  */
-@WebFilter(urlPatterns = {"/*"}, filterName = "CharacterEncodingFilter")
 public class CharacterEncodingFilter implements Filter {
 
     @Override
@@ -33,14 +29,6 @@ public class CharacterEncodingFilter implements Filter {
         if (!isBinaryOrPdf(uri) && httpResp.getContentType() == null) {
             // Không ép với PDF, JSON, JS, CSS, images...
             httpResp.setContentType("text/html; charset=UTF-8");
-        }
-
-        // Debug keyword (nếu có)
-        String keyword = request.getParameter("keyword");
-        if (keyword != null) {
-            System.out.println("🔍 FILTER - Original keyword: [" + keyword + "]");
-            System.out.println("🔍 FILTER - Length: " + keyword.length());
-            System.out.println("🔍 FILTER - UTF8 bytes: " + Arrays.toString(keyword.getBytes(StandardCharsets.UTF_8)));
         }
 
         chain.doFilter(request, response);
