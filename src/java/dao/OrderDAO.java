@@ -5,10 +5,13 @@ import model.OrderDetail;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
+/**
+ * OrderDAO - thao tác với bảng orders, order_details và cung cấp các thống kê doanh thu
+ */
 public class OrderDAO {
 
     /**
@@ -30,7 +33,7 @@ public class OrderDAO {
             int orderId = -1;
             try (PreparedStatement ps = conn.prepareStatement(insertOrderSQL, Statement.RETURN_GENERATED_KEYS)) {
                 ps.setInt(1, userId);
-                ps.setInt(2, 2);
+                ps.setInt(2, 2); // COD mặc định
                 ps.setString(3, "");
                 ps.setString(4, "");
                 ps.setInt(5, 1);
@@ -260,7 +263,7 @@ public class OrderDAO {
      * Tạo Order + Details trong 1 transaction.
      * B1: Insert Order với coupon_code = NULL để không bị FK/trigger chặn.
      * B2: Insert order_details (triggers sẽ tính total).
-     * B3: Nếu user nhập coupon và coupon tồn tại, UPDATE coupon_code; nếu trigger chặn do điều kiện, bỏ qua coupon.
+     * B3: Nếu user có coupon và coupon tồn tại, UPDATE coupon_code; nếu trigger chặn do điều kiện, bỏ qua coupon.
      */
     public int insertWithDetails(Order order, Map<Integer, OrderDetail> cart) {
         String insertOrderSQL = """
@@ -346,6 +349,12 @@ public class OrderDAO {
                         psCouponUpdate.setString(1, originalCoupon);
                         psCouponUpdate.setInt(2, newOrderId);
                         psCouponUpdate.executeUpdate();
+
+                        // BỔ SUNG: tái tính tổng sau khi cập nhật coupon_code
+                        try (PreparedStatement psRecalc = conn.prepareStatement("CALL recalc_order_total(?)")) {
+                            psRecalc.setInt(1, newOrderId);
+                            psRecalc.execute();
+                        }
                         // Nếu trigger bu_orders_validate_coupon chặn (min_subtotal,..) sẽ ném SQLException -> bỏ qua coupon.
                     } catch (SQLException ce) {
                         ce.printStackTrace(); // log và bỏ qua coupon, vẫn commit đơn
@@ -395,6 +404,7 @@ public class OrderDAO {
 
     /**
      * Lấy 5 tuần gần nhất có doanh thu (chỉ tính 'Đã giao') — dùng created_at
+     * Trả về List<String[]>: [weekLabel, revenue, weekCode]
      */
     public List<String[]> getWeeklyRevenue() {
         List<String[]> list = new ArrayList<>();
@@ -436,6 +446,9 @@ public class OrderDAO {
         return list;
     }
 
+    /**
+     * Chi tiết doanh thu theo tuần: map[weekCode] -> List{ productName, qty, revenueRounded }
+     */
     public Map<String, List<String[]>> getWeeklyRevenueDetails() {
         Map<String, List<String[]>> map = new LinkedHashMap<>();
 
@@ -481,7 +494,7 @@ public class OrderDAO {
      * Tổng doanh thu (chỉ tính đơn 'Đã giao')
      */
     public double getTotalRevenue() {
-        String sql = "SELECT SUM(total_price) FROM `orders` WHERE status = 'Đã giao'";
+        String sql = "SELECT COALESCE(SUM(total_price), 0) FROM `orders` WHERE status = 'Đã giao'";
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 return rs.getDouble(1);
@@ -490,6 +503,85 @@ public class OrderDAO {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    /**
+     * Doanh thu hôm nay (đơn 'Đã giao')
+     */
+    public double getTodayRevenue() {
+        String sql = "SELECT COALESCE(SUM(total_price),0) AS total FROM `orders` WHERE status = 'Đã giao' AND DATE(created_at) = CURRENT_DATE()";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getDouble("total");
+        } catch (Exception e) { e.printStackTrace(); }
+        return 0.0;
+    }
+
+    /**
+     * Doanh thu tháng hiện tại (đơn 'Đã giao')
+     */
+    public double getThisMonthRevenue() {
+        String sql = "SELECT COALESCE(SUM(total_price),0) AS total FROM `orders` " +
+                     "WHERE status = 'Đã giao' AND YEAR(created_at) = YEAR(CURRENT_DATE()) AND MONTH(created_at) = MONTH(CURRENT_DATE())";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getDouble("total");
+        } catch (Exception e) { e.printStackTrace(); }
+        return 0.0;
+    }
+
+    /**
+     * Doanh thu năm hiện tại (đơn 'Đã giao')
+     */
+    public double getThisYearRevenue() {
+        String sql = "SELECT COALESCE(SUM(total_price),0) AS total FROM `orders` " +
+                     "WHERE status = 'Đã giao' AND YEAR(created_at) = YEAR(CURRENT_DATE())";
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getDouble("total");
+        } catch (Exception e) { e.printStackTrace(); }
+        return 0.0;
+    }
+
+    /**
+     * Doanh thu theo ngày (N ngày gần nhất)
+     * Trả List<String[]>: [yyyy-MM-dd, total]
+     */
+    public List<String[]> getDailyRevenue(int days) {
+        List<String[]> list = new ArrayList<>();
+        String sql = "SELECT DATE(created_at) AS d, COALESCE(SUM(total_price),0) AS total " +
+                     "FROM orders WHERE status='Đã giao' " +
+                     "AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL ? DAY) " +
+                     "GROUP BY DATE(created_at) ORDER BY d ASC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, days);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new String[]{ rs.getDate("d").toString(), String.valueOf(rs.getDouble("total")) });
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return list;
+    }
+
+    /**
+     * Doanh thu theo tháng (M tháng gần nhất)
+     * Trả List<String[]>: [yyyy-MM, total]
+     */
+    public List<String[]> getMonthlyRevenue(int monthsBack) {
+        List<String[]> list = new ArrayList<>();
+        String sql = "SELECT DATE_FORMAT(created_at,'%Y-%m') AS m, COALESCE(SUM(total_price),0) AS total " +
+                     "FROM orders WHERE status='Đã giao' " +
+                     "AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL ? MONTH) " +
+                     "GROUP BY m ORDER BY m ASC";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, monthsBack);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new String[]{ rs.getString("m"), String.valueOf(rs.getDouble("total")) });
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return list;
     }
 
     /**
@@ -507,24 +599,105 @@ public class OrderDAO {
         return false;
     }
 
-    public List<String[]> getRevenueDetailByWeek(String weekCode) {
-        List<String[]> list = new ArrayList<>();
+    /**
+     * Chi tiết doanh thu theo tuần: mỗi phần tử [image_path, name, qty, revenue]
+     */
+    public List<Object[]> getRevenueDetailByWeek(String weekCode) {
+        List<Object[]> list = new ArrayList<>();
         String sql = """
-            SELECT p.name, SUM(d.quantity) AS qty, SUM(d.quantity * d.price) AS revenue
+            SELECT p.image_path,
+                   p.name,
+                   SUM(d.quantity) AS total_qty,
+                   SUM(d.quantity * d.price) AS total_revenue
             FROM orders o
             JOIN order_details d ON o.order_id = d.order_id
             JOIN products p ON p.product_id = d.product_id
-            WHERE o.status = 'Đã giao' AND YEARWEEK(o.created_at, 1) = ?
-            GROUP BY p.name
+            WHERE o.status = 'Đã giao' AND CAST(YEARWEEK(o.created_at, 1) AS CHAR) = ?
+            GROUP BY p.image_path, p.name
+            ORDER BY total_revenue DESC
+            LIMIT 500
         """;
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, weekCode);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    list.add(new String[]{
+                    list.add(new Object[]{
+                            rs.getString("image_path"),
                             rs.getString("name"),
-                            rs.getString("qty"),
-                            String.format("%.0f", rs.getDouble("revenue"))
+                            rs.getInt("total_qty"),
+                            rs.getDouble("total_revenue")
+                    });
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    /**
+     * Chi tiết doanh thu theo ngày yyyy-MM-dd: mỗi phần tử [image_path, name, qty, revenue]
+     */
+    public List<Object[]> getRevenueDetailByDay(String dateYmd) {
+        List<Object[]> list = new ArrayList<>();
+        String sql = """
+            SELECT p.image_path,
+                   p.name,
+                   SUM(d.quantity) AS total_qty,
+                   SUM(d.quantity * d.price) AS total_revenue
+            FROM orders o
+            JOIN order_details d ON o.order_id = d.order_id
+            JOIN products p ON p.product_id = d.product_id
+            WHERE o.status = 'Đã giao' AND DATE(o.created_at) = ?
+            GROUP BY p.image_path, p.name
+            ORDER BY total_revenue DESC
+            LIMIT 500
+        """;
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, dateYmd);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Object[]{
+                            rs.getString("image_path"),
+                            rs.getString("name"),
+                            rs.getInt("total_qty"),
+                            rs.getDouble("total_revenue")
+                    });
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return list;
+    }
+
+    /**
+     * Chi tiết doanh thu theo tháng yyyy-MM: mỗi phần tử [image_path, name, qty, revenue]
+     */
+    public List<Object[]> getRevenueDetailByMonth(String monthYm) {
+        List<Object[]> list = new ArrayList<>();
+        String sql = """
+            SELECT p.image_path,
+                   p.name,
+                   SUM(d.quantity) AS total_qty,
+                   SUM(d.quantity * d.price) AS total_revenue
+            FROM orders o
+            JOIN order_details d ON o.order_id = d.order_id
+            JOIN products p ON p.product_id = d.product_id
+            WHERE o.status = 'Đã giao' AND DATE_FORMAT(o.created_at,'%Y-%m') = ?
+            GROUP BY p.image_path, p.name
+            ORDER BY total_revenue DESC
+            LIMIT 1000
+        """;
+        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, monthYm);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(new Object[]{
+                            rs.getString("image_path"),
+                            rs.getString("name"),
+                            rs.getInt("total_qty"),
+                            rs.getDouble("total_revenue")
                     });
                 }
             }
@@ -543,7 +716,7 @@ public class OrderDAO {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
-        }
+    }
 
     private static void setNullableString(PreparedStatement ps, int idx, String value) throws SQLException {
         String v = trimToNull(value);

@@ -43,7 +43,7 @@ public class FeedbackDAO {
 
             while (rs.next()) {
                 Feedback f = new Feedback();
-                f.setId(rs.getInt("id"));
+                f.setId(rs.getInt("feedback_id"));
                 f.setName(rs.getString("name"));
                 f.setEmail(rs.getString("email"));
                 f.setMessage(rs.getString("message"));

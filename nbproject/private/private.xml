@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project-private xmlns="http://www.netbeans.org/ns/project-private/1">
+    <editor-bookmarks xmlns="http://www.netbeans.org/ns/editor-bookmarks/2" lastBookmarkId="0"/>
+    <open-files xmlns="http://www.netbeans.org/ns/projectui-open-files/2">
+        <group>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/partials/header.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/ProfileServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/dao/UserDAO.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/PaymentServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_check.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/model/Order.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_customers.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/model/OrderDetail.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_orders.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_dashboard.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_products.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_order_detail.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_account.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/ChatServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/dao/ChatDAO.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminChatServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminProductServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminOrderServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminFeedbackServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/dao/CategoryDAO.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/dao/CouponDAO.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/model/Coupon.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_coupons.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminCouponServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/WEB-INF/web.xml</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/dao/FeedbackDAO.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_add_product.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/partials/footer.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AccountServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/ProductServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/partials/admin_navbar.jspf</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_chat.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_edit_product.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_feedback.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_revenue.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/admin/admin_revenue_detail.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AuthServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/search.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/model/ChatMessage.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/partials/admin_sidebar.jspf</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/payment_confirmed.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminCustomerServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/InvoiceServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/SendFeedbackServlet.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/model/Category.java</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/index.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/cart.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/web/profile.jsp</file>
+            <file>file:/C:/Users/MasaHide/Documents/NetBeansProjects/LightWebProject/src/java/controller/AdminDashboardServlet.java</file>
+        </group>
+    </open-files>
+</project-private>

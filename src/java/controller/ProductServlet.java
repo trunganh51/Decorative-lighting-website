@@ -2,34 +2,34 @@ package controller;
 
 import dao.CategoryDAO;
 import dao.ProductDAO;
+import dao.ReviewDAO;
 import model.Category;
 import model.Product;
+import model.ProductReview;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.*;
 
 import java.io.IOException;
 import java.text.Normalizer;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Controller servlet hiển thị danh sách, chi tiết và tìm kiếm sản phẩm.
- * Hỗ trợ lọc theo danh mục cha/con, phân trang, và sản phẩm bán chạy.
+ * Bổ sung nạp review: avgRating, reviewCount, reviews (approved).
  */
 @WebServlet(name = "ProductServlet", urlPatterns = "/products")
 public class ProductServlet extends HttpServlet {
 
     private final ProductDAO productDAO = new ProductDAO();
     private final CategoryDAO categoryDAO = new CategoryDAO();
+    private final ReviewDAO reviewDAO = new ReviewDAO();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // Set encoding BEFORE reading any parameters
         req.setCharacterEncoding("UTF-8");
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("text/html; charset=UTF-8");
@@ -49,7 +49,7 @@ public class ProductServlet extends HttpServlet {
 
     private void handleListAction(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-
+        // giữ nguyên nội dung như bạn đã có
         String categoryParam = req.getParameter("category");
         String parentParam = req.getParameter("parent");
         String sortBy = req.getParameter("sortBy");
@@ -59,15 +59,12 @@ public class ProductServlet extends HttpServlet {
 
         String pageParam = req.getParameter("page");
         if (pageParam != null && !pageParam.isEmpty()) {
-            try {
-                page = Integer.parseInt(pageParam);
-            } catch (NumberFormatException ignored) {}
+            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
         }
 
         List<Product> products;
         int totalProducts;
 
-        // Ưu tiên lọc theo danh mục cha nếu có tham số parent
         if (parentParam != null && !parentParam.isEmpty()) {
             try {
                 int parentId = Integer.parseInt(parentParam);
@@ -75,12 +72,10 @@ public class ProductServlet extends HttpServlet {
                 totalProducts = productDAO.countProductsByParentCategory(parentId);
                 req.setAttribute("selectedParent", parentId);
             } catch (NumberFormatException e) {
-                // Fallback khi parent không hợp lệ
                 products = productDAO.getProductsByPageSorted(page, pageSize, sortBy);
                 totalProducts = productDAO.countProducts();
             }
         } else if (categoryParam != null && !categoryParam.isEmpty()) {
-            // Lọc theo alias hoặc id danh mục con
             switch (categoryParam.toLowerCase()) {
                 case "trongnha" -> {
                     products = productDAO.getProductsByParentCategoryPagedSorted(1, page, pageSize, sortBy);
@@ -105,12 +100,10 @@ public class ProductServlet extends HttpServlet {
                 }
             }
         } else {
-            // Danh sách tất cả sản phẩm (có sort)
             products = productDAO.getProductsByPageSorted(page, pageSize, sortBy);
             totalProducts = productDAO.countProducts();
         }
 
-        // Top 5 sản phẩm bán chạy + danh sách danh mục
         List<Product> bestSellers = productDAO.getBestSellingProducts(5);
         List<Category> categories = categoryDAO.getAllCategories();
 
@@ -127,12 +120,9 @@ public class ProductServlet extends HttpServlet {
         req.getRequestDispatcher("index.jsp").forward(req, resp);
     }
 
-    /**
-     * Tìm kiếm nâng cao: keyword + minPrice + maxPrice + category + sortBy + phân trang
-     */
     private void handleSearchAction(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-
+        // giữ nguyên như cũ
         String keyword = req.getParameter("keyword");
         String minPriceStr = req.getParameter("minPrice");
         String maxPriceStr = req.getParameter("maxPrice");
@@ -143,9 +133,7 @@ public class ProductServlet extends HttpServlet {
         int pageSize = 8;
         String pageParam = req.getParameter("page");
         if (pageParam != null && !pageParam.isEmpty()) {
-            try {
-                page = Integer.parseInt(pageParam);
-            } catch (NumberFormatException ignored) {}
+            try { page = Integer.parseInt(pageParam); } catch (NumberFormatException ignored) {}
         }
 
         Double minPrice = (minPriceStr != null && !minPriceStr.isEmpty()) ? Double.valueOf(minPriceStr) : null;
@@ -157,7 +145,6 @@ public class ProductServlet extends HttpServlet {
             System.out.println("=== Processed search keyword: [" + keyword + "] ===");
         }
 
-        // Search products (có phân trang + sort)
         List<Product> products = productDAO.searchProductsAdvanced(keyword, minPrice, maxPrice, categoryId, page, pageSize, sortBy);
         int totalProducts = productDAO.countProductsAdvanced(keyword, minPrice, maxPrice, categoryId);
         int totalPages = (int) Math.ceil((double) totalProducts / pageSize);
@@ -191,8 +178,30 @@ public class ProductServlet extends HttpServlet {
                     if (relatedProducts.size() > 6)
                         relatedProducts = relatedProducts.subList(0, 6);
 
+                    // Recent products (Session) như đã gửi trước
+                    HttpSession session = req.getSession();
+                    @SuppressWarnings("unchecked")
+                    LinkedList<Integer> recentIds = (LinkedList<Integer>) session.getAttribute("recentProductIds");
+                    if (recentIds == null) recentIds = new LinkedList<>();
+                    recentIds.removeIf(pid -> pid == id);
+                    recentIds.addFirst(id);
+                    while (recentIds.size() > 12) recentIds.removeLast();
+                    session.setAttribute("recentProductIds", recentIds);
+                    List<Integer> idsToShow = recentIds.stream().filter(pid -> pid != id).toList();
+                    List<Product> recentProducts = productDAO.getProductsByIdsPreserveOrder(idsToShow);
+
+                    // Load reviews
+                    List<ProductReview> reviews = reviewDAO.getApprovedByProduct(id);
+                    Double avgRating = reviewDAO.getAverageRating(id);
+                    Integer reviewCount = reviewDAO.countApproved(id);
+
                     req.setAttribute("product", product);
                     req.setAttribute("relatedProducts", relatedProducts);
+                    req.setAttribute("recentProducts", recentProducts);
+                    req.setAttribute("reviews", reviews);
+                    req.setAttribute("avgRating", avgRating);
+                    req.setAttribute("reviewCount", reviewCount);
+
                     req.getRequestDispatcher("product_detail.jsp").forward(req, resp);
                     return;
                 }
@@ -201,27 +210,12 @@ public class ProductServlet extends HttpServlet {
         resp.sendRedirect(req.getContextPath() + "/products?action=list");
     }
 
-    /**
-     * Chuẩn hoá tiếng Việt cho keyword
-     */
     private String normalizeVietnameseText(String text) {
-        if (text == null || text.isEmpty()) {
-            return text;
-        }
-
-        // Step 1: Trim whitespace
+        if (text == null || text.isEmpty()) return text;
         text = text.trim();
-
-        // Step 2: Unicode normalization (NFC form for Vietnamese)
         text = Normalizer.normalize(text, Normalizer.Form.NFC);
-
-        // Step 3: Remove clearly invalid characters while preserving Vietnamese
-        // Keep letters, numbers, spaces, hyphens, underscores, dots
         text = text.replaceAll("[^\\p{L}\\p{N}\\s\\-_.]", "");
-
-        // Step 4: Normalize whitespace
         text = text.replaceAll("\\s+", " ").trim();
-
         return text;
     }
 }

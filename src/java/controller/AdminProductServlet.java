@@ -56,7 +56,7 @@ public class AdminProductServlet extends HttpServlet {
         } else if (action.equals("new") || action.equals("add")) {
             List<Category> categories = categoryDAO.getAllCategories();
             req.setAttribute("categories", categories);
-            req.getRequestDispatcher("/admin/add_product.jsp").forward(req, resp);
+            req.getRequestDispatcher("/admin/admin_add_product.jsp").forward(req, resp);
 
         } else if (action.equals("edit")) {
             try {
@@ -65,7 +65,7 @@ public class AdminProductServlet extends HttpServlet {
                 List<Category> categories = categoryDAO.getAllCategories();
                 req.setAttribute("product", product);
                 req.setAttribute("categories", categories);
-                req.getRequestDispatcher("/admin/edit_product.jsp").forward(req, resp);
+                req.getRequestDispatcher("/admin/admin_edit_product.jsp").forward(req, resp);
             } catch (Exception e) {
                 e.printStackTrace();
                 resp.sendRedirect(req.getContextPath() + "/admin/products?action=list");
@@ -81,25 +81,58 @@ public class AdminProductServlet extends HttpServlet {
             resp.sendRedirect(req.getContextPath() + "/admin/products?action=list");
 
         } else if (action.equals("revenue")) {
-            // ✅ Trang biểu đồ doanh thu
+            // ✅ Trang biểu đồ doanh thu (overview)
+            double todayRevenue = orderDAO.getTodayRevenue();
+            double thisMonthRevenue = orderDAO.getThisMonthRevenue();
+            double thisYearRevenue = orderDAO.getThisYearRevenue();
+            req.setAttribute("todayRevenue", todayRevenue);
+            req.setAttribute("thisMonthRevenue", thisMonthRevenue);
+            req.setAttribute("thisYearRevenue", thisYearRevenue);
+
             List<String[]> weeklyRevenue = orderDAO.getWeeklyRevenue();
-            Map<String, List<String[]>> weeklyDetails = orderDAO.getWeeklyRevenueDetails();
             req.setAttribute("weeklyRevenue", weeklyRevenue);
-            req.setAttribute("weeklyDetails", weeklyDetails);
-            req.getRequestDispatcher("/admin/revenue.jsp").forward(req, resp);
+
+            req.setAttribute("dailyRevenue", orderDAO.getDailyRevenue(14));
+            req.setAttribute("monthlyRevenue", orderDAO.getMonthlyRevenue(12));
+
+            req.getRequestDispatcher("/admin/admin_revenue.jsp").forward(req, resp);
 
         } else if (action.equals("revenueDetail")) {
-            // ✅ Trang chi tiết doanh thu theo tuần
-            String weekCode = req.getParameter("week");
+            // ✅ Chi tiết theo tuần
+            // Lưu ý: admin_revenue.jsp truyền tham số weekCode, chỉnh đúng tên tham số ở đây
+            String weekCode = req.getParameter("weekCode");
             if (weekCode == null || weekCode.isEmpty()) {
                 resp.sendRedirect(req.getContextPath() + "/admin/products?action=revenue");
                 return;
             }
-
-            List<String[]> details = orderDAO.getRevenueDetailByWeek(weekCode);
-            req.setAttribute("weekCode", weekCode);
+            java.util.List<Object[]> details = orderDAO.getRevenueDetailByWeek(weekCode.trim());
+            req.setAttribute("title", "Chi tiết doanh thu tuần " + weekCode);
             req.setAttribute("details", details);
-            req.getRequestDispatcher("/admin/revenue_detail.jsp").forward(req, resp);
+            req.getRequestDispatcher("/admin/admin_revenue_detail.jsp").forward(req, resp);
+
+        } else if (action.equals("revenueDetailDay")) {
+            // ✅ Chi tiết theo ngày yyyy-MM-dd
+            String date = req.getParameter("date");
+            if (date == null || date.isEmpty()) {
+                resp.sendRedirect(req.getContextPath() + "/admin/products?action=revenue");
+                return;
+            }
+            java.util.List<Object[]> details = orderDAO.getRevenueDetailByDay(date.trim());
+            req.setAttribute("title", "Chi tiết doanh thu ngày " + date);
+            req.setAttribute("details", details);
+            req.getRequestDispatcher("/admin/admin_revenue_detail.jsp").forward(req, resp);
+
+        } else if (action.equals("revenueDetailMonth")) {
+            // ✅ Chi tiết theo tháng yyyy-MM
+            String month = req.getParameter("month");
+            if (month == null || month.isEmpty()) {
+                resp.sendRedirect(req.getContextPath() + "/admin/products?action=revenue");
+                return;
+            }
+            java.util.List<Object[]> details = orderDAO.getRevenueDetailByMonth(month.trim());
+            req.setAttribute("title", "Chi tiết doanh thu tháng " + month);
+            req.setAttribute("details", details);
+            req.getRequestDispatcher("/admin/admin_revenue_detail.jsp").forward(req, resp);
 
         } else {
             resp.sendRedirect(req.getContextPath() + "/admin/products?action=list");
@@ -134,6 +167,9 @@ public class AdminProductServlet extends HttpServlet {
             case "update":
                 handleAddOrUpdate(req, resp, true);
                 break;
+            case "updateQuantity":
+                handleUpdateQuantity(req, resp);
+                break;
             default:
                 resp.sendRedirect(req.getContextPath() + "/admin/products?action=list");
                 break;
@@ -166,11 +202,15 @@ public class AdminProductServlet extends HttpServlet {
                 File projectDir = buildDir.getParentFile().getParentFile();
                 File imageDir = new File(projectDir, "web/images");
 
-                if (!imageDir.exists()) imageDir.mkdirs();
+                if (!imageDir.exists()) {
+                    imageDir.mkdirs();
+                }
 
                 if (imagePath != null && !imagePath.isEmpty()) {
                     File oldFile = new File(imageDir, new File(imagePath).getName());
-                    if (oldFile.exists()) oldFile.delete();
+                    if (oldFile.exists()) {
+                        oldFile.delete();
+                    }
                 }
 
                 File savedFile = new File(imageDir, fileName);
@@ -196,13 +236,53 @@ public class AdminProductServlet extends HttpServlet {
                 ok = productDAO.updateProduct(p);
             }
 
-            if (!ok) System.err.println("⚠️ Không thể lưu vào CSDL.");
+            if (!ok) {
+                System.err.println("⚠️ Không thể lưu vào CSDL.");
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
         }
 
         resp.sendRedirect(req.getContextPath() + "/admin/products?action=list");
+    }
+
+    // ✅ Tăng/giảm tồn kho nhanh (delta có thể âm), ghi lịch sử
+    private void handleUpdateQuantity(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        try {
+            int id = parseIntOrDefault(req.getParameter("id"), 0);
+            int delta = parseIntOrDefault(req.getParameter("delta"), 0);
+            String reason = nvl(req.getParameter("reason"));
+
+            if (id <= 0 || delta == 0) {
+                resp.sendRedirect(req.getContextPath() + "/admin/dashboard");
+                return;
+            }
+
+            Product p = productDAO.getProductById(id);
+            if (p == null) {
+                resp.sendRedirect(req.getContextPath() + "/admin/dashboard");
+                return;
+            }
+
+            int newQty = p.getQuantity() + delta;
+            if (newQty < 0) newQty = 0; // Clamp không âm
+            p.setQuantity(newQty);
+            boolean ok = productDAO.updateProduct(p);
+
+            if (ok) {
+                try {
+                    dao.InventoryMovementDAO invDAO = new dao.InventoryMovementDAO();
+                    invDAO.insertManualAdjust(id, delta, reason != null && !reason.isEmpty() ? reason :
+                            (delta > 0 ? ("Restock +" + delta) : ("Adjust " + delta)), null);
+                } catch (Exception ignore) {}
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        // Trở về dashboard để thấy kết quả
+        resp.sendRedirect(req.getContextPath() + "/admin/dashboard");
     }
 
     private static String nvl(String s) {

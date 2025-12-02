@@ -1,10 +1,13 @@
 package dao;
 
 import model.User;
+
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * UserDAO: Quản lý thao tác với bảng Users, remember_tokens và password_resets
@@ -13,6 +16,54 @@ public class UserDAO {
 
     public Connection getConnection() throws SQLException {
         return DBConnection.getConnection();
+    }
+
+    // ========================== CẬP NHẬT HỒ SƠ (PROFILE) ==========================
+    /**
+     * Cập nhật tên, email và (tùy chọn) mật khẩu cho user.
+     *
+     * @param id user_id
+     * @param fullName tên hiển thị mới
+     * @param email email mới
+     * @param newPassword nếu null hoặc rỗng sẽ giữ nguyên mật khẩu
+     * @return true nếu có dòng bị ảnh hưởng
+     */
+    public boolean updateUserProfile(int id, String fullName, String email, String newPassword) throws SQLException {
+        boolean changePassword = newPassword != null && !newPassword.isEmpty();
+
+        String sql;
+        if (changePassword) {
+            sql = "UPDATE users SET full_name = ?, email = ?, password_hash = ? WHERE user_id = ?";
+        } else {
+            sql = "UPDATE users SET full_name = ?, email = ? WHERE user_id = ?";
+        }
+
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, fullName);
+            ps.setString(2, email);
+            if (changePassword) {
+                ps.setString(3, newPassword); // plain text theo thiết kế hiện tại
+                ps.setInt(4, id);
+            } else {
+                ps.setInt(3, id);
+            }
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    /**
+     * Kiểm tra email đã tồn tại ở user khác chưa (phục vụ cập nhật email).
+     */
+    public boolean emailExistsForOther(int currentUserId, String email) throws SQLException {
+        String sql = "SELECT 1 FROM users WHERE email = ? AND user_id <> ? LIMIT 1";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, email);
+            ps.setInt(2, currentUserId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
     }
 
     // ========================== ĐĂNG KÝ ==========================
@@ -226,7 +277,8 @@ public class UserDAO {
     }
 
     public boolean changeUserRole(int id, String role) {
-        String sql = "UPDATE users SET role = ? WHERE id = ?";
+        // Sửa WHERE id -> user_id
+        String sql = "UPDATE users SET role = ? WHERE user_id = ?";
         try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, role);
             ps.setInt(2, id);
@@ -237,7 +289,7 @@ public class UserDAO {
         }
     }
 
-// Lấy user theo id
+    // Lấy user theo id
     public User getUserById(int id) {
         User user = null;
         String sql = "SELECT * FROM users WHERE user_id=?";
@@ -246,11 +298,12 @@ public class UserDAO {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     user = new User();
-                    user.setId(rs.getInt("id"));
+                    user.setId(rs.getInt("user_id")); // sửa map cột đúng
                     user.setFullName(rs.getString("full_name"));
                     user.setEmail(rs.getString("email"));
                     user.setPassword(rs.getString("password_hash"));
-                    // Các trường khác tùy yêu cầu
+                    user.setRole(rs.getString("role"));
+                    user.setPhoneNumber(rs.getString("phoneNumber"));
                 }
             }
         } catch (Exception e) {
@@ -274,8 +327,47 @@ public class UserDAO {
                 ));
             }
         } catch (SQLException e) {
-            e.printStackTrace();
         }
         return list;
+    }
+
+    // ========================== TOP USERS (Doanh thu) ==========================
+    /**
+     * Trả về top N người dùng theo tổng chi tiêu (tổng total_price của đơn 'Đã
+     * giao'), kèm số đơn hàng. Sử dụng bảng orders theo status = 'Đã giao'.
+     */
+    public List<Map<String, Object>> getTopUsers(int limit) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        String sql = """
+            SELECT u.user_id AS user_id,
+                   u.full_name AS full_name,
+                   u.email AS email,
+                   u.phoneNumber AS phoneNumber,
+                   COUNT(o.order_id) AS orderCount,
+                   COALESCE(SUM(o.total_price), 0) AS totalSpent
+            FROM users u
+            LEFT JOIN orders o ON o.user_id = u.user_id
+            WHERE o.status = 'Đã giao'
+            GROUP BY u.user_id, u.full_name, u.email, u.phoneNumber
+            ORDER BY totalSpent DESC
+            LIMIT ?
+        """;
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("user_id", rs.getInt("user_id"));
+                    row.put("full_name", rs.getString("full_name"));
+                    row.put("email", rs.getString("email"));
+                    row.put("phoneNumber", rs.getString("phoneNumber"));
+                    row.put("orderCount", rs.getInt("orderCount"));
+                    row.put("totalSpent", rs.getDouble("totalSpent"));
+                    result.add(row);
+                }
+            }
+        } catch (SQLException e) {
+        }
+        return result;
     }
 }
