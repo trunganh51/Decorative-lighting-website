@@ -1,10 +1,12 @@
 package controller;
 
+import dao.CouponDAO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import model.Order;
 import model.OrderDetail;
+import model.User;
 import util.PdfGenerator;
 
 import java.io.ByteArrayOutputStream;
@@ -26,18 +28,22 @@ public class QuoteServlet extends HttpServlet {
         Map<Integer, OrderDetail> cart = (Map<Integer, OrderDetail>) session.getAttribute("cart");
         if (cart == null || cart.isEmpty()) { resp.sendError(400, "Giỏ hàng trống."); return; }
 
+        User user = (User) session.getAttribute("user");
+
         String receiver = first(req,"receiverName","buyer_name");
+        if (blank(receiver) && user != null) receiver = nz(user.getFullName());
         String phone    = first(req,"phone","buyer_tel");
+        if (blank(phone) && user != null)    phone = nz(user.getPhoneNumber());
         String address  = first(req,"address","buyer_address");
+        if (blank(address) && user != null)  address = nz(user.getAddress());
         String province = first(req,"provinceId","buyer_province");
-        String ship     = first(req,"shippingMethod","shippingMethodHidden","shippingMethodSelect");
+        int provinceId  = parseIntOrDefault(province, user != null && user.getProvinceId()!=null ? user.getProvinceId() : 1);
+
+        String ship     = normalizeShip(first(req,"shippingMethod","shippingMethodHidden","shippingMethodSelect"));
         String pay      = first(req,"paymentId","pay_method_display");
+        int paymentId   = parseIntOrDefault(pay,2); // 1: chuyển khoản, 2: COD
         String note     = first(req,"note");
         String coupon   = first(req,"couponCode");
-
-        int provinceId = parseIntOrDefault(province,1);
-        int paymentId  = parseIntOrDefault(pay,2);
-        if (ship.isEmpty()) ship = "standard";
 
         Order order = new Order();
         order.setReceiverName(receiver);
@@ -47,8 +53,9 @@ public class QuoteServlet extends HttpServlet {
         order.setShippingMethod(ship);
         order.setPaymentId(paymentId);
         order.setNote(note);
-        order.setCouponCode(coupon);
+        order.setCouponCode(blank(coupon) ? null : coupon.trim());
 
+        // Dòng chi tiết & tạm tính
         List<OrderDetail> details = new ArrayList<>();
         double subtotal = 0;
         for (OrderDetail line : cart.values()) {
@@ -62,16 +69,28 @@ public class QuoteServlet extends HttpServlet {
         }
         order.setOrderDetails(details);
 
+        // Phí ship theo enum DB
         double shipFee = switch (ship) {
             case "express" -> 60000;
             case "overnight" -> 120000;
             default -> 30000;
         };
         order.setShippingFee(shipFee);
+
+        // Thuế 10% theo DB
         double tax = Math.round(subtotal * 0.10 * 100.0) / 100.0;
         order.setTax(tax);
+
+        // Tính giảm theo coupon (nếu có)
         double discount = 0;
+        if (order.getCouponCode() != null) {
+            CouponDAO dao = new CouponDAO();
+            CouponDAO.CouponCalcResult r = dao.validateAndCalc(order.getCouponCode(), subtotal);
+            if (r.valid) discount = r.discount;
+        }
         order.setDiscountAmount(discount);
+
+        // Tổng cộng
         order.setTotalPrice(subtotal + shipFee + tax - discount);
 
         boolean download = "/download".equalsIgnoreCase(req.getPathInfo());
@@ -105,5 +124,15 @@ public class QuoteServlet extends HttpServlet {
         }
         return "";
     }
+    private boolean blank(String s){ return s == null || s.trim().isEmpty(); }
+    private String nz(String s){ return s == null ? "" : s; }
     private int parseIntOrDefault(String s, int def){ try { return Integer.parseInt(s); } catch(Exception e){ return def; } }
+    private String normalizeShip(String ship) {
+        if (ship == null) return "standard";
+        ship = ship.trim().toLowerCase(Locale.ROOT);
+        return switch (ship) {
+            case "express", "overnight", "standard" -> ship;
+            default -> "standard";
+        };
+    }
 }

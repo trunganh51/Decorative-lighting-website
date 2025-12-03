@@ -4,13 +4,14 @@ import model.User;
 
 import java.sql.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
- * UserDAO: Quản lý thao tác với bảng Users, remember_tokens và password_resets
+ * UserDAO: Quản lý thao tác với bảng users, remember_tokens, password_resets.
+ * Chú ý: Mật khẩu đang được lưu plain text theo thiết kế ban đầu.
+ * Bảng users theo schema hiện tại đã có các cột:
+ *  full_name, email, password_hash, role, phoneNumber,
+ *  address, province_id, company_name, tax_code, tax_email
  */
 public class UserDAO {
 
@@ -18,42 +19,72 @@ public class UserDAO {
         return DBConnection.getConnection();
     }
 
-    // ========================== CẬP NHẬT HỒ SƠ (PROFILE) ==========================
+    // ========================== PROFILE ==========================
     /**
-     * Cập nhật tên, email và (tùy chọn) mật khẩu cho user.
+     * Cập nhật đầy đủ hồ sơ người dùng.
      *
      * @param id user_id
-     * @param fullName tên hiển thị mới
-     * @param email email mới
-     * @param newPassword nếu null hoặc rỗng sẽ giữ nguyên mật khẩu
-     * @return true nếu có dòng bị ảnh hưởng
+     * @param fullName tên hiển thị
+     * @param email email
+     * @param newPassword mật khẩu mới (null/empty = giữ nguyên)
+     * @param phoneNumber số điện thoại
+     * @param address địa chỉ giao hàng mặc định
+     * @param provinceId id tỉnh/thành (có thể null)
+     * @param companyName tên công ty (xuất hóa đơn)
+     * @param taxCode mã số thuế
+     * @param taxEmail email nhận hóa đơn
+     * @return true nếu cập nhật thành công
      */
-    public boolean updateUserProfile(int id, String fullName, String email, String newPassword) throws SQLException {
-        boolean changePassword = newPassword != null && !newPassword.isEmpty();
+    public boolean updateUserProfile(int id,
+                                     String fullName,
+                                     String email,
+                                     String newPassword,
+                                     String phoneNumber,
+                                     String address,
+                                     Integer provinceId,
+                                     String companyName,
+                                     String taxCode,
+                                     String taxEmail) throws SQLException {
 
-        String sql;
-        if (changePassword) {
-            sql = "UPDATE users SET full_name = ?, email = ?, password_hash = ? WHERE user_id = ?";
-        } else {
-            sql = "UPDATE users SET full_name = ?, email = ? WHERE user_id = ?";
-        }
+        boolean changePassword = newPassword != null && !newPassword.isEmpty();
+        String sql = changePassword ? """
+            UPDATE users
+               SET full_name = ?, email = ?, password_hash = ?,
+                   phoneNumber = ?, address = ?, province_id = ?,
+                   company_name = ?, tax_code = ?, tax_email = ?
+             WHERE user_id = ?
+            """ : """
+            UPDATE users
+               SET full_name = ?, email = ?,
+                   phoneNumber = ?, address = ?, province_id = ?,
+                   company_name = ?, tax_code = ?, tax_email = ?
+             WHERE user_id = ?
+            """;
 
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setString(1, fullName);
-            ps.setString(2, email);
+            int i = 1;
+            ps.setString(i++, fullName);
+            ps.setString(i++, email);
             if (changePassword) {
-                ps.setString(3, newPassword); // plain text theo thiết kế hiện tại
-                ps.setInt(4, id);
-            } else {
-                ps.setInt(3, id);
+                ps.setString(i++, newPassword);
             }
+            ps.setString(i++, phoneNumber);
+            ps.setString(i++, address);
+            if (provinceId == null) {
+                ps.setNull(i++, Types.INTEGER);
+            } else {
+                ps.setInt(i++, provinceId);
+            }
+            ps.setString(i++, companyName);
+            ps.setString(i++, taxCode);
+            ps.setString(i++, taxEmail);
+            ps.setInt(i, id);
             return ps.executeUpdate() > 0;
         }
     }
 
     /**
-     * Kiểm tra email đã tồn tại ở user khác chưa (phục vụ cập nhật email).
+     * Kiểm tra email đã thuộc user khác chưa.
      */
     public boolean emailExistsForOther(int currentUserId, String email) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE email = ? AND user_id <> ? LIMIT 1";
@@ -66,14 +97,25 @@ public class UserDAO {
         }
     }
 
-    // ========================== ĐĂNG KÝ ==========================
+    // ========================== REGISTER ==========================
     public boolean register(User u) {
-        String sql = "INSERT INTO Users (full_name, email, password_hash, role) VALUES (?, ?, ?, ?)";
+        String sql = """
+            INSERT INTO users (full_name, email, password_hash, role,
+                               phoneNumber, address, province_id,
+                               company_name, tax_code, tax_email)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """;
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, u.getFullName());
             ps.setString(2, u.getEmail());
-            ps.setString(3, u.getPassword()); // lưu plain text
+            ps.setString(3, u.getPassword());
             ps.setString(4, u.getRole());
+            ps.setString(5, u.getPhoneNumber());
+            ps.setString(6, u.getAddress());
+            if (u.getProvinceId() == null) ps.setNull(7, Types.INTEGER); else ps.setInt(7, u.getProvinceId());
+            ps.setString(8, u.getCompanyName());
+            ps.setString(9, u.getTaxCode());
+            ps.setString(10, u.getTaxEmail());
             return ps.executeUpdate() > 0;
         } catch (Exception e) {
             e.printStackTrace();
@@ -81,23 +123,14 @@ public class UserDAO {
         return false;
     }
 
-    // ========================== ĐĂNG NHẬP ==========================
+    // ========================== LOGIN ==========================
     public User login(String email, String password) {
-        String sql = "SELECT * FROM Users WHERE email = ? AND password_hash = ?";
+        String sql = "SELECT * FROM users WHERE email = ? AND password_hash = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
-            ps.setString(2, password); // so sánh plain text
+            ps.setString(2, password);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new User(
-                            rs.getInt("user_id"),
-                            rs.getString("full_name"),
-                            rs.getString("email"),
-                            rs.getString("password_hash"),
-                            rs.getString("role"),
-                            rs.getString("phoneNumber")
-                    );
-                }
+                if (rs.next()) return mapUser(rs);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -117,21 +150,15 @@ public class UserDAO {
     }
 
     public User findByRememberToken(String token) throws SQLException {
-        String sql = "SELECT u.* FROM Users u JOIN remember_tokens r ON u.user_id = r.user_id "
-                + "WHERE r.token = ? AND r.expire_at > CURRENT_TIMESTAMP";
+        String sql = """
+            SELECT u.* FROM users u
+            JOIN remember_tokens r ON u.user_id = r.user_id
+            WHERE r.token = ? AND r.expire_at > CURRENT_TIMESTAMP
+            """;
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, token);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new User(
-                            rs.getInt("user_id"),
-                            rs.getString("full_name"),
-                            rs.getString("email"),
-                            rs.getString("password_hash"),
-                            rs.getString("role"),
-                            rs.getString("phoneNumber")
-                    );
-                }
+                if (rs.next()) return mapUser(rs);
             }
         }
         return null;
@@ -149,23 +176,20 @@ public class UserDAO {
     public void saveResetToken(int userId, String token) throws SQLException {
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
-            String deleteSql = "DELETE FROM password_resets WHERE user_id = ? OR expire_at < CURRENT_TIMESTAMP";
-            try (PreparedStatement ps = conn.prepareStatement(deleteSql)) {
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DELETE FROM password_resets WHERE user_id = ? OR expire_at < CURRENT_TIMESTAMP")) {
                 ps.setInt(1, userId);
                 ps.executeUpdate();
             }
-
-            String insertSql = """
+            try (PreparedStatement ps = conn.prepareStatement("""
                 INSERT INTO password_resets (user_id, email, token, expire_at, created_at, used)
                 SELECT user_id, email, ?, CURRENT_TIMESTAMP + INTERVAL 1 HOUR, CURRENT_TIMESTAMP, 0
-                FROM Users WHERE user_id = ?
-            """;
-            try (PreparedStatement ps = conn.prepareStatement(insertSql)) {
+                FROM users WHERE user_id = ?
+                """)) {
                 ps.setString(1, token);
                 ps.setInt(2, userId);
                 ps.executeUpdate();
             }
-
             conn.commit();
             conn.setAutoCommit(true);
         }
@@ -173,24 +197,15 @@ public class UserDAO {
 
     public User findByResetToken(String token) throws SQLException {
         String sql = """
-            SELECT u.* FROM Users u
+            SELECT u.* FROM users u
             JOIN password_resets p ON u.user_id = p.user_id
             WHERE p.token = ? AND p.expire_at > CURRENT_TIMESTAMP AND p.used = 0
             LIMIT 1
-        """;
+            """;
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, token);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new User(
-                            rs.getInt("user_id"),
-                            rs.getString("full_name"),
-                            rs.getString("email"),
-                            rs.getString("password_hash"),
-                            rs.getString("role"),
-                            rs.getString("phoneNumber")
-                    );
-                }
+                if (rs.next()) return mapUser(rs);
             }
         }
         return null;
@@ -205,29 +220,20 @@ public class UserDAO {
     }
 
     public void updatePassword(int userId, String newPassword) throws SQLException {
-        String sql = "UPDATE Users SET password_hash = ? WHERE user_id = ?";
+        String sql = "UPDATE users SET password_hash = ? WHERE user_id = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, newPassword); // plain text
+            ps.setString(1, newPassword);
             ps.setInt(2, userId);
             ps.executeUpdate();
         }
     }
 
     public User findByEmail(String email) {
-        String sql = "SELECT * FROM Users WHERE email = ?";
+        String sql = "SELECT * FROM users WHERE email = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return new User(
-                            rs.getInt("user_id"),
-                            rs.getString("full_name"),
-                            rs.getString("email"),
-                            rs.getString("password_hash"),
-                            rs.getString("role"),
-                            rs.getString("phoneNumber")
-                    );
-                }
+                if (rs.next()) return mapUser(rs);
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -235,28 +241,18 @@ public class UserDAO {
         return null;
     }
 
-    //search
+    // ========================== SEARCH ==========================
     public List<User> searchUsers(String keyword) {
         List<User> list = new ArrayList<>();
         String sql = "SELECT * FROM users WHERE full_name LIKE ? OR email LIKE ? OR role LIKE ? OR phoneNumber LIKE ? ORDER BY user_id";
-
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             String k = "%" + keyword + "%";
             ps.setString(1, k);
             ps.setString(2, k);
             ps.setString(3, k);
             ps.setString(4, k);
-
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                User u = new User();
-                u.setId(rs.getInt("user_id"));
-                u.setFullName(rs.getString("full_name"));
-                u.setEmail(rs.getString("email"));
-                u.setRole(rs.getString("role"));
-                u.setPhoneNumber(rs.getString("phoneNumber"));
-                list.add(u);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) list.add(mapUser(rs));
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -264,22 +260,19 @@ public class UserDAO {
         return list;
     }
 
-    // change
+    // ========================== DELETE / ROLE ==========================
     public boolean deleteUser(int id) {
-        String sql = "DELETE FROM users WHERE user_id=?";
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "DELETE FROM users WHERE user_id = ?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
             return ps.executeUpdate() > 0;
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) { e.printStackTrace(); }
         return false;
     }
 
     public boolean changeUserRole(int id, String role) {
-        // Sửa WHERE id -> user_id
         String sql = "UPDATE users SET role = ? WHERE user_id = ?";
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, role);
             ps.setInt(2, id);
             return ps.executeUpdate() > 0;
@@ -289,69 +282,44 @@ public class UserDAO {
         }
     }
 
-    // Lấy user theo id
+    // ========================== GET ONE / ALL ==========================
     public User getUserById(int id) {
-        User user = null;
-        String sql = "SELECT * FROM users WHERE user_id=?";
-        try (Connection conn = DBConnection.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "SELECT * FROM users WHERE user_id = ?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    user = new User();
-                    user.setId(rs.getInt("user_id")); // sửa map cột đúng
-                    user.setFullName(rs.getString("full_name"));
-                    user.setEmail(rs.getString("email"));
-                    user.setPassword(rs.getString("password_hash"));
-                    user.setRole(rs.getString("role"));
-                    user.setPhoneNumber(rs.getString("phoneNumber"));
-                }
+                if (rs.next()) return mapUser(rs);
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return user;
+        } catch (Exception e) { e.printStackTrace(); }
+        return null;
     }
 
     public List<User> getAllUsers() {
         List<User> list = new ArrayList<>();
-        String sql = "SELECT * FROM Users ORDER BY user_id";
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                list.add(new User(
-                        rs.getInt("user_id"),
-                        rs.getString("full_name"),
-                        rs.getString("email"),
-                        rs.getString("password_hash"),
-                        rs.getString("role"),
-                        rs.getString("phoneNumber")
-                ));
-            }
-        } catch (SQLException e) {
-        }
+        String sql = "SELECT * FROM users ORDER BY user_id";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) list.add(mapUser(rs));
+        } catch (SQLException e) { e.printStackTrace(); }
         return list;
     }
 
-    // ========================== TOP USERS (Doanh thu) ==========================
-    /**
-     * Trả về top N người dùng theo tổng chi tiêu (tổng total_price của đơn 'Đã
-     * giao'), kèm số đơn hàng. Sử dụng bảng orders theo status = 'Đã giao'.
-     */
+    // ========================== TOP USERS ==========================
     public List<Map<String, Object>> getTopUsers(int limit) {
         List<Map<String, Object>> result = new ArrayList<>();
         String sql = """
-            SELECT u.user_id AS user_id,
-                   u.full_name AS full_name,
-                   u.email AS email,
-                   u.phoneNumber AS phoneNumber,
+            SELECT u.user_id,
+                   u.full_name,
+                   u.email,
+                   u.phoneNumber,
                    COUNT(o.order_id) AS orderCount,
-                   COALESCE(SUM(o.total_price), 0) AS totalSpent
+                   COALESCE(SUM(o.total_price),0) AS totalSpent
             FROM users u
-            LEFT JOIN orders o ON o.user_id = u.user_id
-            WHERE o.status = 'Đã giao'
+            LEFT JOIN orders o ON o.user_id = u.user_id AND o.status = 'Đã giao'
             GROUP BY u.user_id, u.full_name, u.email, u.phoneNumber
             ORDER BY totalSpent DESC
             LIMIT ?
-        """;
+            """;
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, limit);
             try (ResultSet rs = ps.executeQuery()) {
@@ -367,7 +335,27 @@ public class UserDAO {
                 }
             }
         } catch (SQLException e) {
+            e.printStackTrace();
         }
         return result;
+    }
+
+    // ========================== MAP HELPER ==========================
+    private User mapUser(ResultSet rs) throws SQLException {
+        User u = new User(
+                rs.getInt("user_id"),
+                rs.getString("full_name"),
+                rs.getString("email"),
+                rs.getString("password_hash"),
+                rs.getString("role"),
+                rs.getString("phoneNumber")
+        );
+        u.setAddress(rs.getString("address"));
+        Object pObj = rs.getObject("province_id");
+        u.setProvinceId(pObj == null ? null : rs.getInt("province_id"));
+        u.setCompanyName(rs.getString("company_name"));
+        u.setTaxCode(rs.getString("tax_code"));
+        u.setTaxEmail(rs.getString("tax_email"));
+        return u;
     }
 }

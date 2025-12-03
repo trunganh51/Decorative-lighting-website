@@ -2,12 +2,23 @@ package dao;
 
 import model.Coupon;
 
-import java.sql.*;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.*;
 
+/**
+ * CouponDAO khớp với bảng coupons trong DB:
+ * (coupon_id, code, description, discount_type, value, max_discount,
+ *  start_at, end_at, usage_limit, used_count, min_subtotal, active)
+ *
+ * Lưu ý: TRÁNH import java.sql.* để không xung đột với java.util.Date.
+ * Dùng import tường minh cho các lớp java.sql và dùng java.util.Date cho xử lý ngày.
+ */
 public class CouponDAO {
 
     public static class Preview {
@@ -22,37 +33,58 @@ public class CouponDAO {
         public Double discountedTotal;
     }
 
+    public static class CouponCalcResult {
+        public final boolean valid;
+        public final double discount;
+        public final String message;
+        public CouponCalcResult(boolean valid, double discount, String message) {
+            this.valid = valid;
+            this.discount = discount;
+            this.message = message;
+        }
+    }
+
+    private Connection getConnection() throws SQLException {
+        return DBConnection.getConnection();
+    }
+
+    // ================= CRUD / Query =================
+
     public List<Coupon> getAllCoupons() {
         List<Coupon> list = new ArrayList<>();
-        String sql = "SELECT coupon_id, code, description, discount_type, value, max_discount, start_at, end_at, usage_limit, used_count, min_subtotal, active FROM coupons ORDER BY coupon_id DESC";
-        try (Connection c = DBConnection.getConnection();
+        String sql = """
+            SELECT coupon_id, code, description, discount_type, value, max_discount,
+                   start_at, end_at, usage_limit, used_count, min_subtotal, active
+            FROM coupons
+            ORDER BY coupon_id DESC
+        """;
+        try (Connection c = getConnection();
              PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                Coupon cp = new Coupon();
-                cp.setId(rs.getInt("coupon_id"));
-                cp.setCode(rs.getString("code"));
-                cp.setDescription(rs.getString("description"));
-                cp.setDiscountType(rs.getString("discount_type"));
-                cp.setValue(rs.getDouble("value"));
-                java.math.BigDecimal md = rs.getBigDecimal("max_discount");
-                cp.setMaxDiscount(md != null ? md.doubleValue() : null);
-                cp.setStartDate(rs.getTimestamp("start_at"));
-                cp.setEndDate(rs.getTimestamp("end_at"));
-                Number ul = (Number) rs.getObject("usage_limit");
-                cp.setUsageLimit(ul != null ? ul.intValue() : null);
-                cp.setUsedCount(rs.getInt("used_count"));
-                cp.setMinSubtotal(rs.getDouble("min_subtotal"));
-                cp.setActive(rs.getBoolean("active"));
-                list.add(cp);
-            }
+            while (rs.next()) list.add(mapRow(rs));
         } catch (Exception e) { e.printStackTrace(); }
         return list;
     }
 
+    public Coupon findByCode(String code) {
+        String sql = """
+            SELECT coupon_id, code, description, discount_type, value, max_discount,
+                   start_at, end_at, usage_limit, used_count, min_subtotal, active
+            FROM coupons WHERE code = ? LIMIT 1
+        """;
+        try (Connection c = getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, code);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return mapRow(rs);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return null;
+    }
+
     public boolean existsByCode(String code) {
         String sql = "SELECT 1 FROM coupons WHERE code = ? LIMIT 1";
-        try (Connection c = DBConnection.getConnection();
+        try (Connection c = getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, code);
             try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
@@ -61,38 +93,34 @@ public class CouponDAO {
     }
 
     public boolean insert(Coupon cpn) {
-        String sql = "INSERT INTO coupons (code, description, discount_type, value, max_discount, start_at, end_at, usage_limit, min_subtotal, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection c = DBConnection.getConnection();
+        String sql = """
+            INSERT INTO coupons
+              (code, description, discount_type, value, max_discount,
+               start_at, end_at, usage_limit, min_subtotal, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """;
+        try (Connection c = getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
-            // Chuẩn hoá thời gian để không vi phạm NOT NULL và đảm bảo hiệu lực đến hết ngày
-            Date start = cpn.getStartDate();
-            Date end = cpn.getEndDate();
-            Date now = new Date();
-            if (start == null) start = startOfDay(now);
-            else start = startOfDay(start);
-
-            if (end == null) end = endOfDay(addDays(start, 365));
-            else end = endOfDay(end);
-
-            if (end.before(start)) end = endOfDay(start);
+            java.util.Date start = normalizeStart(cpn.getStartDate());
+            java.util.Date end   = normalizeEnd(cpn.getEndDate(), start);
 
             ps.setString(1, cpn.getCode());
             ps.setString(2, cpn.getDescription());
             ps.setString(3, cpn.getDiscountType());
             ps.setDouble(4, cpn.getValue() != null ? cpn.getValue() : 0d);
 
-            if (cpn.getMaxDiscount() == null) ps.setNull(5, Types.DECIMAL);
-            else ps.setBigDecimal(5, java.math.BigDecimal.valueOf(cpn.getMaxDiscount()));
+            if (cpn.getMaxDiscount() == null) ps.setNull(5, java.sql.Types.DECIMAL);
+            else ps.setBigDecimal(5, BigDecimal.valueOf(cpn.getMaxDiscount()));
 
             ps.setTimestamp(6, new Timestamp(start.getTime()));
             ps.setTimestamp(7, new Timestamp(end.getTime()));
 
-            if (cpn.getUsageLimit() == null) ps.setNull(8, Types.INTEGER);
+            if (cpn.getUsageLimit() == null) ps.setNull(8, java.sql.Types.INTEGER);
             else ps.setInt(8, cpn.getUsageLimit());
 
-            if (cpn.getMinSubtotal() == null) ps.setNull(9, Types.DECIMAL);
-            else ps.setBigDecimal(9, java.math.BigDecimal.valueOf(cpn.getMinSubtotal()));
+            if (cpn.getMinSubtotal() == null) ps.setNull(9, java.sql.Types.DECIMAL);
+            else ps.setBigDecimal(9, BigDecimal.valueOf(cpn.getMinSubtotal()));
 
             ps.setBoolean(10, cpn.isActive());
             return ps.executeUpdate() > 0;
@@ -102,7 +130,7 @@ public class CouponDAO {
 
     public boolean updateActive(int id, boolean active) {
         String sql = "UPDATE coupons SET active = ? WHERE coupon_id = ?";
-        try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setBoolean(1, active);
             ps.setInt(2, id);
             return ps.executeUpdate() > 0;
@@ -112,57 +140,80 @@ public class CouponDAO {
 
     public boolean deleteById(int id) {
         String sql = "DELETE FROM coupons WHERE coupon_id = ?";
-        try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, id);
             return ps.executeUpdate() > 0;
         } catch (Exception e) { e.printStackTrace(); }
         return false;
     }
 
-    // Validate/preview giảm trừ theo code + subtotal (dùng cho cart/payment)
+    // ============== Validation / Calculation ==============
+
+    /**
+     * Xem trước áp dụng coupon cho subtotal (không ghi DB).
+     * Logic:
+     * - active = 1
+     * - NOW() BETWEEN start_at AND end_at
+     * - usage_limit: null -> bỏ qua, else used_count < usage_limit
+     * - subtotal >= COALESCE(min_subtotal,0)
+     * - percent: ROUND(subtotal * (value/100), 2), sau đó min với max_discount (nếu có)
+     * - fixed: min(value, subtotal), ROUND(2)
+     */
     public Preview validatePreview(String code, double subtotal) {
         Preview p = new Preview();
         p.code = code;
-        if (code == null || code.trim().isEmpty() || subtotal <= 0) {
-            p.valid = false; p.message = "Thiếu mã hoặc tổng tiền không hợp lệ";
+
+        if (code == null || code.trim().isEmpty()) {
+            p.valid = false; p.message = "Thiếu mã coupon";
             return p;
         }
-        String sql = "SELECT code, discount_type, value, max_discount, start_at, end_at, usage_limit, used_count, min_subtotal, active FROM coupons WHERE code = ? LIMIT 1";
-        try (Connection c = DBConnection.getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
+        if (subtotal <= 0) {
+            p.valid = false; p.message = "Tổng tiền không hợp lệ";
+            return p;
+        }
+
+        String sql = """
+            SELECT code, discount_type, value, max_discount,
+                   start_at, end_at, usage_limit, used_count, min_subtotal, active
+            FROM coupons WHERE code = ? LIMIT 1
+        """;
+        try (Connection c = getConnection(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, code.trim());
             try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) { p.valid = false; p.message = "Mã không tồn tại"; return p; }
+                if (!rs.next()) { p.valid=false; p.message="Mã không tồn tại"; return p; }
 
                 boolean active = rs.getBoolean("active");
                 Timestamp startAt = rs.getTimestamp("start_at");
-                Timestamp endAt = rs.getTimestamp("end_at");
-                Number ul = (Number) rs.getObject("usage_limit");
-                Integer usageLimit = ul != null ? ul.intValue() : null;
-                int usedCount = rs.getInt("used_count");
-                double minSubtotal = rs.getDouble("min_subtotal");
+                Timestamp endAt   = rs.getTimestamp("end_at");
+
+                Integer usageLimit = rs.getObject("usage_limit") == null ? null : rs.getInt("usage_limit");
+                int usedCount      = rs.getInt("used_count");
+
+                BigDecimal minSubtotalBD = (BigDecimal) rs.getObject("min_subtotal");
+                double minSubtotal = (minSubtotalBD == null) ? 0.0 : minSubtotalBD.doubleValue();
+
                 String type = rs.getString("discount_type");
                 double value = rs.getDouble("value");
-                java.math.BigDecimal md = (java.math.BigDecimal) rs.getObject("max_discount");
-                Double maxDiscount = (md != null ? md.doubleValue() : null);
+                BigDecimal maxDiscountBD = (BigDecimal) rs.getObject("max_discount");
+                Double maxDiscount = (maxDiscountBD != null ? maxDiscountBD.doubleValue() : null);
 
                 long now = System.currentTimeMillis();
                 if (!active) { p.valid=false; p.message="Mã đang tắt"; return p; }
                 if (startAt != null && now < startAt.getTime()) { p.valid=false; p.message="Mã chưa hiệu lực"; return p; }
-                if (endAt != null && now > endAt.getTime()) { p.valid=false; p.message="Mã đã hết hạn"; return p; }
+                if (endAt   != null && now > endAt.getTime())   { p.valid=false; p.message="Mã đã hết hạn"; return p; }
                 if (usageLimit != null && usedCount >= usageLimit) { p.valid=false; p.message="Mã đã hết lượt dùng"; return p; }
-                if (subtotal < (minSubtotal <= 0 ? 0 : minSubtotal)) { p.valid=false; p.message="Chưa đạt tối thiểu " + (long)minSubtotal; return p; }
+                if (subtotal < Math.max(0, minSubtotal)) { p.valid=false; p.message="Chưa đạt tối thiểu " + formatMoney(minSubtotal); return p; }
 
+                // Tính giảm
                 double discount;
                 if ("percent".equalsIgnoreCase(type)) {
-                    // ROUND 2 chữ số như DB
-                    java.math.BigDecimal bdSubtotal = java.math.BigDecimal.valueOf(subtotal);
-                    java.math.BigDecimal bdRate = java.math.BigDecimal.valueOf(value).divide(java.math.BigDecimal.valueOf(100));
-                    double d = bdSubtotal.multiply(bdRate).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
-                    discount = d;
-                    if (maxDiscount != null) discount = Math.min(discount, maxDiscount);
+                    BigDecimal bdSubtotal = BigDecimal.valueOf(subtotal);
+                    BigDecimal bdRate = BigDecimal.valueOf(value).divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+                    double calc = bdSubtotal.multiply(bdRate).setScale(2, RoundingMode.HALF_UP).doubleValue(); // ROUND 2
+                    discount = maxDiscount != null ? Math.min(calc, maxDiscount) : calc;
                 } else {
                     discount = Math.min(value, subtotal);
-                    discount = java.math.BigDecimal.valueOf(discount).setScale(2, java.math.RoundingMode.HALF_UP).doubleValue();
+                    discount = BigDecimal.valueOf(discount).setScale(2, RoundingMode.HALF_UP).doubleValue();
                 }
 
                 p.valid = true;
@@ -172,7 +223,7 @@ public class CouponDAO {
                 p.maxDiscount = maxDiscount;
                 p.minSubtotal = minSubtotal;
                 p.discount = discount;
-                p.discountedTotal = Math.max(0, subtotal - discount);
+                p.discountedTotal = Math.max(0, BigDecimal.valueOf(subtotal - discount).setScale(2, RoundingMode.HALF_UP).doubleValue());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -181,8 +232,48 @@ public class CouponDAO {
         return p;
     }
 
-    // ===== helpers =====
-    private static Date startOfDay(Date d) {
+    /**
+     * Dùng cho báo giá/invoice: chỉ cần biết hợp lệ và số tiền giảm.
+     */
+    public CouponCalcResult validateAndCalc(String code, double subtotal) {
+        Preview pv = validatePreview(code, subtotal);
+        if (!pv.valid) {
+            return new CouponCalcResult(false, 0.0, pv.message);
+        }
+        double d = pv.discount != null ? pv.discount : 0.0;
+        return new CouponCalcResult(true, d, "OK");
+    }
+
+    // ================= Helpers =================
+
+    private Coupon mapRow(ResultSet rs) throws SQLException {
+        Coupon cp = new Coupon();
+        cp.setId(rs.getInt("coupon_id"));
+        cp.setCode(rs.getString("code"));
+        cp.setDescription(rs.getString("description"));
+        cp.setDiscountType(rs.getString("discount_type"));
+        cp.setValue(rs.getDouble("value"));
+
+        BigDecimal maxD = (BigDecimal) rs.getObject("max_discount");
+        cp.setMaxDiscount(maxD != null ? maxD.doubleValue() : null);
+
+        cp.setStartDate(rs.getTimestamp("start_at"));
+        cp.setEndDate(rs.getTimestamp("end_at"));
+
+        Number ul = (Number) rs.getObject("usage_limit");
+        cp.setUsageLimit(ul != null ? ul.intValue() : null);
+
+        cp.setUsedCount(rs.getInt("used_count"));
+
+        BigDecimal minS = (BigDecimal) rs.getObject("min_subtotal");
+        cp.setMinSubtotal(minS != null ? minS.doubleValue() : 0.0);
+
+        cp.setActive(rs.getBoolean("active"));
+        return cp;
+    }
+
+    // Dùng java.util.Date tường minh để tránh xung đột với java.sql.Date
+    private static java.util.Date startOfDay(java.util.Date d) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(d);
         cal.set(Calendar.HOUR_OF_DAY, 0);
@@ -191,7 +282,7 @@ public class CouponDAO {
         cal.set(Calendar.MILLISECOND, 0);
         return cal.getTime();
     }
-    private static Date endOfDay(Date d) {
+    private static java.util.Date endOfDay(java.util.Date d) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(d);
         cal.set(Calendar.HOUR_OF_DAY, 23);
@@ -200,10 +291,27 @@ public class CouponDAO {
         cal.set(Calendar.MILLISECOND, 999);
         return cal.getTime();
     }
-    private static Date addDays(Date d, int days) {
+    private static java.util.Date addDays(java.util.Date d, int days) {
         Calendar cal = Calendar.getInstance();
         cal.setTime(d);
         cal.add(Calendar.DAY_OF_MONTH, days);
         return cal.getTime();
+    }
+
+    private static java.util.Date normalizeStart(java.util.Date start) {
+        java.util.Date now = new java.util.Date();
+        return start == null ? startOfDay(now) : startOfDay(start);
+    }
+    private static java.util.Date normalizeEnd(java.util.Date end, java.util.Date start) {
+        if (end == null) return endOfDay(addDays(start, 365));
+        java.util.Date e = endOfDay(end);
+        if (e.before(start)) e = endOfDay(start);
+        return e;
+    }
+
+    private static String formatMoney(double v) {
+        long lv = (long) v;
+        if (Math.abs(v - lv) < 0.005) return String.format("%,d", lv);
+        return String.format("%,.2f", v);
     }
 }

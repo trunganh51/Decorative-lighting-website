@@ -3,15 +3,16 @@ package controller;
 import dao.UserDAO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.*;
 import model.User;
 
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.regex.Pattern;
 
+/**
+ * ProfileServlet: cập nhật hồ sơ user theo các cột hiện có trong database (users).
+ */
 @WebServlet(name = "ProfileServlet", urlPatterns = "/profile")
 public class ProfileServlet extends HttpServlet {
 
@@ -41,57 +42,67 @@ public class ProfileServlet extends HttpServlet {
             return;
         }
 
-        String fullName = safeTrim(request.getParameter("fullName"));
-        String email = safeTrim(request.getParameter("email"));
-        String password = safeTrim(request.getParameter("password"));
-        String confirmPassword = safeTrim(request.getParameter("confirmPassword"));
+        // Lấy form fields
+        String fullName       = safeTrim(request.getParameter("fullName"));
+        String email          = safeTrim(request.getParameter("email"));
+        String password       = safeTrim(request.getParameter("password"));
+        String confirmPassword= safeTrim(request.getParameter("confirmPassword"));
 
-        // Đưa dữ liệu người dùng (đã nhập) về request để giữ lại form khi có lỗi
+        String phoneNumber    = safeTrim(request.getParameter("phoneNumber"));
+        String address        = safeTrim(request.getParameter("address"));
+        String provinceRaw    = safeTrim(request.getParameter("provinceId"));
+        Integer provinceId    = parseIntOrNull(provinceRaw);
+
+        String companyName    = safeTrim(request.getParameter("companyName"));
+        String taxCode        = safeTrim(request.getParameter("taxCode"));
+        String taxEmail       = safeTrim(request.getParameter("taxEmail"));
+
+        // User để hiển thị lại khi lỗi
         User viewUser = new User(
                 sessionUser.getId(),
                 fullName != null ? fullName : sessionUser.getFullName(),
                 email != null ? email : sessionUser.getEmail(),
                 sessionUser.getPassword(),
                 sessionUser.getRole(),
-                sessionUser.getPhoneNumber()
+                phoneNumber != null ? phoneNumber : sessionUser.getPhoneNumber()
         );
+        viewUser.setAddress(address != null ? address : sessionUser.getAddress());
+        viewUser.setProvinceId(provinceId != null ? provinceId : sessionUser.getProvinceId());
+        viewUser.setCompanyName(companyName != null ? companyName : sessionUser.getCompanyName());
+        viewUser.setTaxCode(taxCode != null ? taxCode : sessionUser.getTaxCode());
+        viewUser.setTaxEmail(taxEmail != null ? taxEmail : sessionUser.getTaxEmail());
 
-        // Validate cơ bản
+        // Validate
         if (isBlank(fullName)) {
-            request.setAttribute("error", "Vui lòng nhập tên hiển thị.");
-            request.setAttribute("user", viewUser);
-            request.getRequestDispatcher("/profile.jsp").forward(request, response);
+            forwardError("Vui lòng nhập tên hiển thị.", viewUser, request, response);
             return;
         }
         if (isBlank(email) || !EMAIL_RE.matcher(email).matches()) {
-            request.setAttribute("error", "Email không hợp lệ.");
-            request.setAttribute("user", viewUser);
-            request.getRequestDispatcher("/profile.jsp").forward(request, response);
+            forwardError("Email không hợp lệ.", viewUser, request, response);
             return;
         }
+
         boolean changePassword = !isBlank(password) || !isBlank(confirmPassword);
         if (changePassword) {
             if (!password.equals(confirmPassword)) {
-                request.setAttribute("error", "Mật khẩu nhập lại không khớp.");
-                request.setAttribute("user", viewUser);
-                request.getRequestDispatcher("/profile.jsp").forward(request, response);
+                forwardError("Mật khẩu nhập lại không khớp.", viewUser, request, response);
                 return;
             }
             if (password.length() < 6 || password.length() > 32) {
-                request.setAttribute("error", "Mật khẩu phải từ 6 đến 32 ký tự.");
-                request.setAttribute("user", viewUser);
-                request.getRequestDispatcher("/profile.jsp").forward(request, response);
+                forwardError("Mật khẩu phải từ 6 đến 32 ký tự.", viewUser, request, response);
                 return;
             }
+        }
+
+        if (!isBlank(taxEmail) && !EMAIL_RE.matcher(taxEmail).matches()) {
+            forwardError("Email hóa đơn không hợp lệ.", viewUser, request, response);
+            return;
         }
 
         UserDAO dao = new UserDAO();
         try {
-            // Kiểm tra email đã tồn tại cho user khác hay chưa
             if (dao.emailExistsForOther(sessionUser.getId(), email)) {
-                request.setAttribute("error", "Email đã được sử dụng bởi tài khoản khác.");
-                request.setAttribute("user", viewUser);
-                request.getRequestDispatcher("/profile.jsp").forward(request, response);
+                forwardError("Email đã được sử dụng bởi tài khoản khác.", viewUser, request, response);
                 return;
             }
 
@@ -99,40 +110,51 @@ public class ProfileServlet extends HttpServlet {
                     sessionUser.getId(),
                     fullName,
                     email,
-                    changePassword ? password : null
+                    changePassword ? password : null,
+                    phoneNumber,
+                    address,
+                    provinceId,
+                    companyName,
+                    taxCode,
+                    taxEmail
             );
-
             if (!ok) {
-                request.setAttribute("error", "Cập nhật không thành công. Vui lòng thử lại.");
-                request.setAttribute("user", viewUser);
-                request.getRequestDispatcher("/profile.jsp").forward(request, response);
+                forwardError("Cập nhật không thành công. Vui lòng thử lại.", viewUser, request, response);
                 return;
             }
 
-            // Cập nhật lại session user
+            // Update session user
             sessionUser.setFullName(fullName);
             sessionUser.setEmail(email);
-            if (changePassword) {
-                sessionUser.setPassword(password);
-            }
+            if (changePassword) sessionUser.setPassword(password);
+            sessionUser.setPhoneNumber(phoneNumber);
+            sessionUser.setAddress(address);
+            sessionUser.setProvinceId(provinceId);
+            sessionUser.setCompanyName(companyName);
+            sessionUser.setTaxCode(taxCode);
+            sessionUser.setTaxEmail(taxEmail);
             request.getSession().setAttribute("user", sessionUser);
 
             request.setAttribute("success", "Cập nhật thành công!");
             request.setAttribute("user", sessionUser);
             request.getRequestDispatcher("/profile.jsp").forward(request, response);
         } catch (SQLException e) {
-            // Trường hợp hiếm: đụng unique email ở DB hoặc lỗi khác
-            request.setAttribute("error", "Có lỗi xảy ra khi cập nhật: " + e.getMessage());
-            request.setAttribute("user", viewUser);
-            request.getRequestDispatcher("/profile.jsp").forward(request, response);
+            forwardError("Có lỗi khi cập nhật: " + e.getMessage(), viewUser, request, response);
         }
     }
 
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
+    private void forwardError(String msg, User viewUser,
+                              HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+        req.setAttribute("error", msg);
+        req.setAttribute("user", viewUser);
+        req.getRequestDispatcher("/profile.jsp").forward(req, resp);
     }
 
-    private static String safeTrim(String s) {
-        return s == null ? null : s.trim();
+    private static boolean isBlank(String s) { return s == null || s.trim().isEmpty(); }
+    private static String safeTrim(String s) { return s == null ? null : s.trim(); }
+    private static Integer parseIntOrNull(String s) {
+        if (isBlank(s)) return null;
+        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return null; }
     }
 }

@@ -407,12 +407,12 @@ public class ProductDAO {
         String sql = "SELECT * FROM products ORDER BY sold_quantity DESC LIMIT ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, limit);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(extractProduct(rs));
+                ps.setInt(1, limit);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        list.add(extractProduct(rs));
+                    }
                 }
-            }
         } catch (Exception e) {
             e.printStackTrace();
         }

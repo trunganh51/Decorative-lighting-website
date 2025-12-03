@@ -3,8 +3,8 @@ package model;
 import java.util.Date;
 
 /**
- * Model OrderDetail khớp với bảng `order_details` (Full v3).
- */
+*
+*/
 public class OrderDetail {
     private int orderDetailId; // order_detail_id
     private int orderId;       // order_id

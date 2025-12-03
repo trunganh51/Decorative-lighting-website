@@ -10,6 +10,7 @@
     double subtotal = (Double) request.getAttribute("inv_subtotal");
     double tax      = (Double) request.getAttribute("inv_tax");
     double ship     = (Double) request.getAttribute("inv_ship");
+    double discount = request.getAttribute("inv_discount") != null ? (Double) request.getAttribute("inv_discount") : 0d;
     double total    = (Double) request.getAttribute("inv_total");
 %>
 <!DOCTYPE html>
@@ -20,7 +21,7 @@
 <style>
     @page { size: A4; margin: 22mm 18mm; }
     body { font-family: 'Segoe UI', Arial, sans-serif; color:#111; }
-    .invoice-wrap { max-width:800px; margin:0 auto; }
+    .invoice-wrap { max-width:900px; margin:0 auto; }
     h1 { font-size:22px; margin:0 0 4px; }
     .top-meta { margin-bottom:30px; }
     .grid-info { display:flex; justify-content:space-between; font-size:13px; margin-bottom:20px; }
@@ -29,9 +30,9 @@
     table { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
     th, td { border:1px solid #444; padding:6px 8px; text-align:left; }
     th { background:#f2f2f2; }
-    .summary { width:260px; float:right; margin-top:20px; border:1px solid #444; }
-    .summary table { border:none; }
-    .summary td { border:none; padding:4px 8px; }
+    .summary { width:320px; float:right; margin-top:20px; border:1px solid #444; }
+    .summary table { border:none; width:100%; }
+    .summary td { border:none; padding:6px 10px; }
     .summary tr.total td { font-weight:700; background:#f2f2f2; }
     .signature { margin-top:70px; text-align:right; font-style:italic; }
     .terms { font-size:12px; margin-top:40px; }
@@ -100,11 +101,14 @@
     </table>
 
     <div class="summary">
-        <table style="width:100%; font-size:13px;">
-            <tr><td>Subtotal</td><td style="text-align:right;"><c:out value="${inv_subtotal}"/>₫</td></tr>
-            <tr><td>Sales Tax (10%)</td><td style="text-align:right;"><c:out value="${inv_tax}"/>₫</td></tr>
-            <tr><td>Shipping</td><td style="text-align:right;"><c:out value="${inv_ship}"/>₫</td></tr>
-            <tr class="total"><td><strong>TOTAL</strong></td><td style="text-align:right;"><strong><c:out value="${inv_total}"/>₫</strong></td></tr>
+        <table>
+            <tr><td>Tạm tính</td><td style="text-align:right;"><c:out value="${inv_subtotal}"/>₫</td></tr>
+            <tr><td>Thuế (10%)</td><td style="text-align:right;"><c:out value="${inv_tax}"/>₫</td></tr>
+            <tr><td>Phí vận chuyển</td><td style="text-align:right;"><c:out value="${inv_ship}"/>₫</td></tr>
+            <c:if test="${inv_discount != null && inv_discount > 0}">
+                <tr><td>Giảm giá</td><td style="text-align:right;">-<c:out value="${inv_discount}"/>₫</td></tr>
+            </c:if>
+            <tr class="total"><td><strong>TỔNG CỘNG</strong></td><td style="text-align:right;"><strong><c:out value="${inv_total}"/>₫</strong></td></tr>
         </table>
     </div>
     <div style="clear:both;"></div>

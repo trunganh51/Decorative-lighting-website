@@ -6,10 +6,7 @@ import model.Product;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.HashMap;
@@ -23,6 +20,20 @@ public class CartServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
+        // Tính subtotal để hiển thị nếu cần
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            @SuppressWarnings("unchecked")
+            Map<Integer, OrderDetail> cart = (Map<Integer, OrderDetail>) session.getAttribute("cart");
+            double subtotal = 0;
+            if (cart != null) {
+                for (OrderDetail od : cart.values()) {
+                    subtotal += od.getSubtotal();
+                }
+            }
+            req.setAttribute("cartSubtotal", subtotal);
+            session.setAttribute("cartSubtotalServer", subtotal);
+        }
         req.getRequestDispatcher("cart.jsp").forward(req, resp);
     }
 
@@ -62,7 +73,7 @@ public class CartServlet extends HttpServlet {
                         line.setPrice(product.getPrice());
                     } else {
                         line.setQuantity(line.getQuantity() + quantity);
-                        // Giá giữ nguyên theo lần thêm đầu tiên hoặc bạn có thể sync lại:
+                        // Nếu muốn đồng bộ giá mới nhất từ DB mỗi lần thêm:
                         // line.setPrice(product.getPrice());
                     }
                     cart.put(productId, line);
@@ -116,6 +127,11 @@ public class CartServlet extends HttpServlet {
                 }
                 success = true;
                 message = "Đã cập nhật số lượng sản phẩm";
+
+            } else if ("clear".equals(action)) {
+                cart.clear();
+                success = true;
+                message = "Đã xóa toàn bộ giỏ hàng";
             }
 
         } catch (NumberFormatException e) {
@@ -126,20 +142,25 @@ public class CartServlet extends HttpServlet {
             e.printStackTrace();
         }
 
-        // Tính tổng số lượng trong giỏ
+        // Tính tổng số lượng trong giỏ (đếm theo quantity)
         cartCount = cart.values().stream().mapToInt(OrderDetail::getQuantity).sum();
+
+        // Tính subtotal để dùng ở payment_confirmed/invoice/quote
+        double subtotal = cart.values().stream().mapToDouble(OrderDetail::getSubtotal).sum();
 
         // Cập nhật session
         session.setAttribute("cart", cart);
-        session.setAttribute("cartSize", cartCount);
-        session.setAttribute("cartDistinct", cart.size());
+        session.setAttribute("cartSize", cartCount);         // tổng số lượng
+        session.setAttribute("cartDistinct", cart.size());   // số mặt hàng khác nhau
+        session.setAttribute("cartSubtotalServer", subtotal);
+
         // Nếu là AJAX
         if ("XMLHttpRequest".equals(req.getHeader("X-Requested-With"))) {
             resp.setContentType("application/json;charset=UTF-8");
             try (PrintWriter out = resp.getWriter()) {
                 out.write(String.format(
-                        "{\"success\": %s, \"message\": \"%s\", \"cartCount\": %d, \"cartSize\": %d}",
-                        success, message, cartCount, cartCount
+                        "{\"success\": %s, \"message\": \"%s\", \"cartCount\": %d, \"cartDistinct\": %d, \"subtotal\": %.2f}",
+                        success, escapeJson(message), cartCount, cart.size(), subtotal
                 ));
             }
             return;
@@ -152,5 +173,10 @@ public class CartServlet extends HttpServlet {
         } else {
             resp.sendRedirect(req.getContextPath() + "/cart.jsp");
         }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\"","\\\"");
     }
 }

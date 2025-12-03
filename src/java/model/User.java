@@ -1,10 +1,8 @@
 package model;
 
 /**
- * Represents a user of the application. Users can be customers or admins
- * depending on their role. For this simple project passwords are stored
- * in plain text (not recommended for production). The default role is
- * {@code user}.
+ * Model User đầy đủ, khớp schema hiện tại của bảng users trong database.
+ * Lưu ý: mật khẩu (password_hash) đang lưu plain text theo thiết kế ban đầu.
  */
 public class User {
     private int id;
@@ -14,8 +12,14 @@ public class User {
     private String role;
     private String phoneNumber;
 
-    public User() {
-    }
+    // Các trường hồ sơ mở rộng theo DB
+    private String address;
+    private Integer provinceId;  // có thể null
+    private String companyName;
+    private String taxCode;
+    private String taxEmail;
+
+    public User() {}
 
     public User(int id, String fullName, String email, String password, String role, String phoneNumber) {
         this.id = id;
@@ -30,51 +34,38 @@ public class User {
         this(0, fullName, email, password, role, phoneNumber);
     }
 
-    public int getId() {
-        return id;
-    }
+    // Getters/Setters cơ bản
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
 
-    public void setId(int id) {
-        this.id = id;
-    }
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
 
-    public String getFullName() {
-        return fullName;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
 
-    public void setPhoneNumber(String phoneNumber) {
-        this.phoneNumber = phoneNumber;
-    }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
+    public String getPhoneNumber() { return phoneNumber; }
+    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
 
-    public String getEmail() {
-        return email;
-    }
+    // Mở rộng theo DB
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public Integer getProvinceId() { return provinceId; }
+    public void setProvinceId(Integer provinceId) { this.provinceId = provinceId; }
 
-    public String getPassword() {
-        return password;
-    }
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+    public String getTaxCode() { return taxCode; }
+    public void setTaxCode(String taxCode) { this.taxCode = taxCode; }
 
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
+    public String getTaxEmail() { return taxEmail; }
+    public void setTaxEmail(String taxEmail) { this.taxEmail = taxEmail; }
 }

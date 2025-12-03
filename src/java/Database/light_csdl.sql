@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3386
--- Generation Time: Dec 02, 2025 at 10:47 AM
+-- Generation Time: Dec 02, 2025 at 11:31 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -869,35 +869,45 @@ CREATE TABLE `users` (
   `role` enum('user','admin') DEFAULT 'user',
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `password_changed_at` timestamp NULL DEFAULT NULL,
-  `phoneNumber` varchar(20) DEFAULT NULL
+  `phoneNumber` varchar(20) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `province_id` int(11) DEFAULT NULL,
+  `company_name` varchar(255) DEFAULT NULL,
+  `tax_code` varchar(50) DEFAULT NULL,
+  `tax_email` varchar(100) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`user_id`, `full_name`, `email`, `password_hash`, `role`, `created_at`, `password_changed_at`, `phoneNumber`) VALUES
-(1, 'Admin One', 'admin1@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000001'),
-(2, 'Admin Two', 'admin2@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000002'),
-(3, 'Admin Three', 'admin3@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000003'),
-(4, 'User Four', 'user4@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000004'),
-(5, 'User Five', 'user5@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000005'),
-(6, 'User Six', 'user6@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000006'),
-(7, 'User Seven', 'user7@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000007'),
-(8, 'User Eight', 'user8@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000008'),
-(9, 'User Nine', 'user9@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000009'),
-(10, 'User Ten', 'user10@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000010'),
-(11, 'User Eleven', 'user11@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000011'),
-(12, 'User Twelve', 'user12@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000012'),
-(13, 'User Thirteen', 'user13@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000013'),
-(14, 'User Fourteen', 'user14@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000014'),
-(15, 'User Fifteen', 'user15@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000015'),
-(16, 'User Sixteen', 'user16@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000016'),
-(17, 'User Seventeen', 'user17@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000017'),
-(18, 'User Eighteen', 'user18@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000018'),
-(19, 'User Nineteen', 'user19@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000019'),
-(20, 'User Twenty', 'user20@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000020'),
-(21, 'Tranh', 'lopa59733@gmail.com', '123456', 'user', '2025-11-11 12:21:45', NULL, NULL);
+INSERT INTO `users` (`user_id`, `full_name`, `email`, `password_hash`, `role`, `created_at`, `password_changed_at`, `phoneNumber`, `address`, `province_id`, `company_name`, `tax_code`, `tax_email`) VALUES
+(1, 'Admin One', 'admin1@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000001', NULL, NULL, NULL, NULL, NULL),
+(2, 'Admin Two', 'admin2@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000002', NULL, NULL, NULL, NULL, NULL),
+(3, 'Admin Three', 'admin3@example.com', '123456', 'admin', '2025-11-10 22:40:19', NULL, '0911000003', NULL, NULL, NULL, NULL, NULL),
+(4, 'User Four', 'user4@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000004', NULL, NULL, NULL, NULL, NULL),
+(5, 'User Five', 'user5@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000005', NULL, NULL, NULL, NULL, NULL),
+(6, 'User Six', 'user6@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000006', NULL, NULL, NULL, NULL, NULL),
+(7, 'User Seven', 'user7@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000007', NULL, NULL, NULL, NULL, NULL),
+(8, 'User Eight', 'user8@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000008', NULL, NULL, NULL, NULL, NULL),
+(9, 'User Nine', 'user9@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000009', NULL, NULL, NULL, NULL, NULL),
+(10, 'User Ten', 'user10@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000010', NULL, NULL, NULL, NULL, NULL),
+(11, 'User Eleven', 'user11@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000011', NULL, NULL, NULL, NULL, NULL),
+(12, 'User Twelve', 'user12@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000012', NULL, NULL, NULL, NULL, NULL),
+(13, 'User Thirteen', 'user13@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000013', NULL, NULL, NULL, NULL, NULL),
+(14, 'User Fourteen', 'user14@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000014', NULL, NULL, NULL, NULL, NULL),
+(15, 'User Fifteen', 'user15@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000015', NULL, NULL, NULL, NULL, NULL),
+(16, 'User Sixteen', 'user16@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000016', NULL, NULL, NULL, NULL, NULL),
+(17, 'User Seventeen', 'user17@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000017', NULL, NULL, NULL, NULL, NULL),
+(18, 'User Eighteen', 'user18@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000018', NULL, NULL, NULL, NULL, NULL),
+(19, 'User Nineteen', 'user19@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000019', NULL, NULL, NULL, NULL, NULL),
+(20, 'User Twenty', 'user20@example.com', '123456', 'user', '2025-11-10 22:40:19', NULL, '0911000020', NULL, NULL, NULL, NULL, NULL),
+(21, 'Tranh', 'lopa59733@gmail.com', '123456', 'user', '2025-11-11 12:21:45', NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(22, 'Nguyễn Minh Quân', 'quan@example.com', '123456', 'admin', '2025-11-01 20:57:23', NULL, '0912345678', NULL, NULL, NULL, NULL, NULL),
+(23, 'Lê Thị Hòa', 'hoa@example.com', '123456', 'user', '2025-11-01 20:57:23', NULL, '0987654321', NULL, NULL, NULL, NULL, NULL),
+(24, 'Phạm Anh Núi', 'duy@example.com', '123456', 'user', '2025-11-01 20:57:23', NULL, '0901122334', NULL, NULL, NULL, NULL, NULL),
+(25, 'Phạm Anh Duy', 'a@example.com', '123456', 'user', '2025-11-10 08:08:10', NULL, '123456123930', NULL, NULL, NULL, NULL, NULL),
+(26, 'clone', 'biennguyen6304@gmail.com', '123456', 'user', '2025-11-24 19:21:19', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1080,7 +1090,8 @@ ALTER TABLE `remember_tokens`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `uq_users_email` (`email`),
-  ADD KEY `idx_users_phone` (`phoneNumber`);
+  ADD KEY `idx_users_phone` (`phoneNumber`),
+  ADD KEY `fk_users_province` (`province_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -1198,7 +1209,7 @@ ALTER TABLE `remember_tokens`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
 
 --
 -- Constraints for dumped tables
@@ -1283,6 +1294,12 @@ ALTER TABLE `product_review_replies`
 --
 ALTER TABLE `remember_tokens`
   ADD CONSTRAINT `fk_remember_tokens_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `users`
+--
+ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_province` FOREIGN KEY (`province_id`) REFERENCES `provinces` (`province_id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 DELIMITER $$
 --
